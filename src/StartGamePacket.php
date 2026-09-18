@@ -60,7 +60,7 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 	public bool $enableNewInventorySystem = false; //TODO
 	public string $serverSoftwareVersion;
 	public UuidInterface $worldTemplateId; //why is this here twice ??? mojang
-	public bool $enableClientSideChunkGeneration;
+	public bool $enableClientSideChunkGeneration = false;
 	public bool $blockNetworkIdsAreHashes = false; //new in 1.19.80, possibly useful for multi version
 	public bool $enableTickDeathSystems = false;
 	public NetworkPermissions $networkPermissions;
@@ -169,6 +169,7 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 		$this->pitch = LE::readFloat($in);
 		$this->yaw = LE::readFloat($in);
 
+		$this->serverTelemetryData = new ServerTelemetryData("", "", "", "");
 		$this->levelSettings = LevelSettings::read($in, $this->serverTelemetryData, $protocolId);
 
 		$this->levelId = CommonTypes::getString($in);
@@ -204,12 +205,16 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 		$this->playerActorProperties = new CacheableNbt(CommonTypes::getNbtCompoundRoot($in));
 		$this->blockPaletteChecksum = LE::readUnsignedLong($in);
 		$this->worldTemplateId = CommonTypes::getUUID($in);
-		$this->enableClientSideChunkGeneration = CommonTypes::getBool($in);
-		$this->blockNetworkIdsAreHashes = CommonTypes::getBool($in);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_20){
+			$this->enableClientSideChunkGeneration = CommonTypes::getBool($in);
+		}
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_80){
+			$this->blockNetworkIdsAreHashes = CommonTypes::getBool($in);
+		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_21_100 && $protocolId <= ProtocolInfo::PROTOCOL_1_21_124){
 			$this->enableTickDeathSystems = CommonTypes::getBool($in);
 		}
-		$this->networkPermissions = NetworkPermissions::decode($in);
+		$this->networkPermissions = $protocolId >= ProtocolInfo::PROTOCOL_1_20_0 ? NetworkPermissions::decode($in) : new NetworkPermissions(false);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_0){
 			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_30 && $protocolId < ProtocolInfo::PROTOCOL_1_26_40){
 				$this->isLoggingChat = CommonTypes::getBool($in);
@@ -261,12 +266,18 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 		$out->writeByteArray($this->playerActorProperties->getEncodedNbt());
 		LE::writeUnsignedLong($out, $this->blockPaletteChecksum);
 		CommonTypes::putUUID($out, $this->worldTemplateId);
-		CommonTypes::putBool($out, $this->enableClientSideChunkGeneration);
-		CommonTypes::putBool($out, $this->blockNetworkIdsAreHashes);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_20){
+			CommonTypes::putBool($out, $this->enableClientSideChunkGeneration);
+		}
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_80){
+			CommonTypes::putBool($out, $this->blockNetworkIdsAreHashes);
+		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_21_100 && $protocolId <= ProtocolInfo::PROTOCOL_1_21_124){
 			CommonTypes::putBool($out, $this->enableTickDeathSystems);
 		}
-		$this->networkPermissions->encode($out);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_20_0){
+			$this->networkPermissions->encode($out);
+		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_0){
 			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_30 && $protocolId < ProtocolInfo::PROTOCOL_1_26_40){
 				CommonTypes::putBool($out, $this->isLoggingChat);

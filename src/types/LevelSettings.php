@@ -110,9 +110,13 @@ final class LevelSettings{
 		$this->difficulty = VarInt::readSignedInt($in);
 		$this->spawnPosition = CommonTypes::getBlockPosition($in, $protocolId >= ProtocolInfo::PROTOCOL_1_26_10);
 		$this->hasAchievementsDisabled = CommonTypes::getBool($in);
-		$this->editorWorldType = $protocolId >= ProtocolInfo::PROTOCOL_1_20_30 ? VarInt::readSignedInt($in) : (CommonTypes::getBool($in) ? EditorWorldType::PROJECT : EditorWorldType::NON_EDITOR);
-		$this->createdInEditorMode = CommonTypes::getBool($in);
-		$this->exportedFromEditorMode = CommonTypes::getBool($in);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_10){
+			$this->editorWorldType = $protocolId >= ProtocolInfo::PROTOCOL_1_20_30 ? VarInt::readSignedInt($in) : (CommonTypes::getBool($in) ? EditorWorldType::PROJECT : EditorWorldType::NON_EDITOR);
+		}
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_80){
+			$this->createdInEditorMode = CommonTypes::getBool($in);
+			$this->exportedFromEditorMode = CommonTypes::getBool($in);
+		}
 		$this->time = VarInt::readSignedInt($in);
 		$this->eduEditionOffer = $protocolId >= ProtocolInfo::PROTOCOL_1_26_40 ? VarInt::readUnsignedInt($in) : VarInt::readSignedInt($in);
 		$this->hasEduFeaturesEnabled = CommonTypes::getBool($in);
@@ -139,17 +143,23 @@ final class LevelSettings{
 		$this->isFromWorldTemplate = CommonTypes::getBool($in);
 		$this->isWorldTemplateOptionLocked = CommonTypes::getBool($in);
 		$this->onlySpawnV1Villagers = CommonTypes::getBool($in);
-		$this->disablePersona = CommonTypes::getBool($in);
-		$this->disableCustomSkins = CommonTypes::getBool($in);
-		$this->muteEmoteAnnouncements = CommonTypes::getBool($in);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_20){
+			$this->disablePersona = CommonTypes::getBool($in);
+			$this->disableCustomSkins = CommonTypes::getBool($in);
+			if($protocolId >= ProtocolInfo::PROTOCOL_1_19_60){
+				$this->muteEmoteAnnouncements = CommonTypes::getBool($in);
+			}
+		}
 		$this->vanillaVersion = CommonTypes::getString($in);
 		$this->limitedWorldWidth = LE::readSignedInt($in); //doesn't make sense for this to be signed, but that's what the spec says
 		$this->limitedWorldLength = LE::readSignedInt($in); //same as above
 		$this->isNewNether = CommonTypes::getBool($in);
 		$this->eduSharedUriResource = EducationUriResource::read($in);
 		$this->experimentalGameplayOverride = CommonTypes::readOptional($in, CommonTypes::getBool(...));
-		$this->chatRestrictionLevel = Byte::readUnsigned($in);
-		$this->disablePlayerInteractions = CommonTypes::getBool($in);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_20){
+			$this->chatRestrictionLevel = Byte::readUnsigned($in);
+			$this->disablePlayerInteractions = CommonTypes::getBool($in);
+		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_30){
 			$this->serverEditorConnectionPolicy = VarInt::readSignedInt($in);
 			$this->allowAnonymousBlockDropsInEditorWorlds = CommonTypes::getBool($in);
@@ -174,13 +184,17 @@ final class LevelSettings{
 		VarInt::writeSignedInt($out, $this->difficulty);
 		CommonTypes::putBlockPosition($out, $this->spawnPosition, $protocolId >= ProtocolInfo::PROTOCOL_1_26_10);
 		CommonTypes::putBool($out, $this->hasAchievementsDisabled);
-		if($protocolId >= ProtocolInfo::PROTOCOL_1_20_30){
-			VarInt::writeSignedInt($out, $this->editorWorldType);
-		}else{
-			CommonTypes::putBool($out, $this->editorWorldType !== EditorWorldType::NON_EDITOR);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_10){
+			if($protocolId >= ProtocolInfo::PROTOCOL_1_20_30){
+				VarInt::writeSignedInt($out, $this->editorWorldType);
+			}else{
+				CommonTypes::putBool($out, $this->editorWorldType !== EditorWorldType::NON_EDITOR);
+			}
 		}
-		CommonTypes::putBool($out, $this->createdInEditorMode);
-		CommonTypes::putBool($out, $this->exportedFromEditorMode);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_80){
+			CommonTypes::putBool($out, $this->createdInEditorMode);
+			CommonTypes::putBool($out, $this->exportedFromEditorMode);
+		}
 		VarInt::writeSignedInt($out, $this->time);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			VarInt::writeUnsignedInt($out, $this->eduEditionOffer);
@@ -211,17 +225,23 @@ final class LevelSettings{
 		CommonTypes::putBool($out, $this->isFromWorldTemplate);
 		CommonTypes::putBool($out, $this->isWorldTemplateOptionLocked);
 		CommonTypes::putBool($out, $this->onlySpawnV1Villagers);
-		CommonTypes::putBool($out, $this->disablePersona);
-		CommonTypes::putBool($out, $this->disableCustomSkins);
-		CommonTypes::putBool($out, $this->muteEmoteAnnouncements);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_20){
+			CommonTypes::putBool($out, $this->disablePersona);
+			CommonTypes::putBool($out, $this->disableCustomSkins);
+			if($protocolId >= ProtocolInfo::PROTOCOL_1_19_60){
+				CommonTypes::putBool($out, $this->muteEmoteAnnouncements);
+			}
+		}
 		CommonTypes::putString($out, $this->vanillaVersion);
 		LE::writeSignedInt($out, $this->limitedWorldWidth); //doesn't make sense for this to be signed, but that's what the spec says
 		LE::writeSignedInt($out, $this->limitedWorldLength); //same as above
 		CommonTypes::putBool($out, $this->isNewNether);
 		($this->eduSharedUriResource ?? new EducationUriResource("", ""))->write($out);
 		CommonTypes::writeOptional($out, $this->experimentalGameplayOverride, CommonTypes::putBool(...));
-		Byte::writeUnsigned($out, $this->chatRestrictionLevel);
-		CommonTypes::putBool($out, $this->disablePlayerInteractions);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_20){
+			Byte::writeUnsigned($out, $this->chatRestrictionLevel);
+			CommonTypes::putBool($out, $this->disablePlayerInteractions);
+		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_30){
 			VarInt::writeSignedInt($out, $this->serverEditorConnectionPolicy);
 			CommonTypes::putBool($out, $this->allowAnonymousBlockDropsInEditorWorlds);

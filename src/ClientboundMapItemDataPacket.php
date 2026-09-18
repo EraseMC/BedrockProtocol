@@ -39,7 +39,7 @@ class ClientboundMapItemDataPacket extends DataPacket implements ClientboundPack
 	public int $mapId;
 	public int $dimensionId = DimensionIds::OVERWORLD;
 	public bool $isLocked = false;
-	public BlockPosition $origin;
+	public ?BlockPosition $origin = null;
 
 	/**
 	 * @var int[]
@@ -68,7 +68,9 @@ class ClientboundMapItemDataPacket extends DataPacket implements ClientboundPack
 		$type = $protocolId < ProtocolInfo::PROTOCOL_1_26_40 ? VarInt::readUnsignedInt($in) : null;
 		$this->dimensionId = Byte::readUnsigned($in);
 		$this->isLocked = CommonTypes::getBool($in);
-		$this->origin = CommonTypes::getBlockPosition($in, $protocolId >= ProtocolInfo::PROTOCOL_1_26_10);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_20){
+			$this->origin = CommonTypes::getBlockPosition($in, $protocolId >= ProtocolInfo::PROTOCOL_1_26_10);
+		}
 
 		$signedY = $protocolId >= ProtocolInfo::PROTOCOL_1_26_10;
 		$readTrackedObject = static function(ByteBufferReader $in) use ($signedY) : MapTrackedObject{
@@ -173,7 +175,9 @@ class ClientboundMapItemDataPacket extends DataPacket implements ClientboundPack
 		}
 		Byte::writeUnsigned($out, $this->dimensionId);
 		CommonTypes::putBool($out, $this->isLocked);
-		CommonTypes::putBlockPosition($out, $this->origin, $protocolId >= ProtocolInfo::PROTOCOL_1_26_10);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_20){
+			CommonTypes::putBlockPosition($out, $this->origin ?? throw new \InvalidArgumentException("Map origin is required on protocol 1.19.20+"), $protocolId >= ProtocolInfo::PROTOCOL_1_26_10);
+		}
 
 		$signedY = $protocolId >= ProtocolInfo::PROTOCOL_1_26_10;
 		$writeTrackedObject = static function(ByteBufferWriter $out, MapTrackedObject $object) use ($signedY) : void{

@@ -33,10 +33,10 @@ class NetworkSettingsPacket extends DataPacket implements ClientboundPacket{
 	public const COMPRESS_EVERYTHING = 1;
 
 	private int $compressionThreshold;
-	private int $compressionAlgorithm;
-	private bool $enableClientThrottling;
-	private int $clientThrottleThreshold;
-	private float $clientThrottleScalar;
+	private int $compressionAlgorithm = CompressionAlgorithm::ZLIB;
+	private bool $enableClientThrottling = false;
+	private int $clientThrottleThreshold = 0;
+	private float $clientThrottleScalar = 0.0;
 
 	/**
 	 * @generate-create-func
@@ -72,18 +72,22 @@ class NetworkSettingsPacket extends DataPacket implements ClientboundPacket{
 
 	protected function decodePayload(ByteBufferReader $in, int $protocolId) : void{
 		$this->compressionThreshold = LE::readUnsignedShort($in);
-		$this->compressionAlgorithm = LE::readUnsignedShort($in);
-		$this->enableClientThrottling = CommonTypes::getBool($in);
-		$this->clientThrottleThreshold = Byte::readUnsigned($in);
-		$this->clientThrottleScalar = LE::readFloat($in);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_30){
+			$this->compressionAlgorithm = LE::readUnsignedShort($in);
+			$this->enableClientThrottling = CommonTypes::getBool($in);
+			$this->clientThrottleThreshold = Byte::readUnsigned($in);
+			$this->clientThrottleScalar = LE::readFloat($in);
+		}
 	}
 
 	protected function encodePayload(ByteBufferWriter $out, int $protocolId) : void{
 		LE::writeUnsignedShort($out, $this->compressionThreshold);
-		LE::writeUnsignedShort($out, $this->compressionAlgorithm);
-		CommonTypes::putBool($out, $this->enableClientThrottling);
-		Byte::writeUnsigned($out, $this->clientThrottleThreshold);
-		LE::writeFloat($out, $this->clientThrottleScalar);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_30){
+			LE::writeUnsignedShort($out, $this->compressionAlgorithm);
+			CommonTypes::putBool($out, $this->enableClientThrottling);
+			Byte::writeUnsigned($out, $this->clientThrottleThreshold);
+			LE::writeFloat($out, $this->clientThrottleScalar);
+		}
 	}
 
 	public function handle(PacketHandlerInterface $handler) : bool{

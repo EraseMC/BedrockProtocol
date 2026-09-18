@@ -26,7 +26,7 @@ class StructureBlockUpdatePacket extends DataPacket implements ServerboundPacket
 	public BlockPosition $blockPosition;
 	public StructureEditorData $structureEditorData;
 	public bool $isPowered;
-	public bool $waterlogged;
+	public bool $waterlogged = false;
 
 	/**
 	 * @generate-create-func
@@ -44,14 +44,18 @@ class StructureBlockUpdatePacket extends DataPacket implements ServerboundPacket
 		$this->blockPosition = CommonTypes::getBlockPosition($in, $protocolId >= ProtocolInfo::PROTOCOL_1_26_10);
 		$this->structureEditorData = CommonTypes::getStructureEditorData($in, $protocolId);
 		$this->isPowered = CommonTypes::getBool($in);
-		$this->waterlogged = CommonTypes::getBool($in);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_30){
+			$this->waterlogged = CommonTypes::getBool($in);
+		}
 	}
 
 	protected function encodePayload(ByteBufferWriter $out, int $protocolId) : void{
 		CommonTypes::putBlockPosition($out, $this->blockPosition, $protocolId >= ProtocolInfo::PROTOCOL_1_26_10);
 		CommonTypes::putStructureEditorData($out, $protocolId, $this->structureEditorData);
 		CommonTypes::putBool($out, $this->isPowered);
-		CommonTypes::putBool($out, $this->waterlogged);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_30){
+			CommonTypes::putBool($out, $this->waterlogged);
+		}
 	}
 
 	public function handle(PacketHandlerInterface $handler) : bool{

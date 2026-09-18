@@ -49,6 +49,7 @@ use function strlen;
 use function strrpos;
 use function strtoupper;
 use function substr;
+use function uasort;
 use const DIRECTORY_SEPARATOR;
 use const JSON_THROW_ON_ERROR;
 use const PHP_EOL;
@@ -262,11 +263,21 @@ final class ProtocolInfo{
 	 */
 
 	/** Actual Minecraft: PE protocol version */
-	public const CURRENT_PROTOCOL = %d;
+	public const CURRENT_PROTOCOL = self::%s;
+	/**
+	 * Profiles which have passed EraseMC's compatibility gates and may be
+	 * accepted by the server. This list intentionally differs from the full
+	 * set of named protocol profiles below.
+	 */
+	public const ACCEPTED_PROTOCOL = [
+%s
+	];
 	/** Display version shown in the server logs. This should match the version on the game's home screen. */
 	public const MINECRAFT_VERSION = '%s';
 	/** Version sent on the network for client side compatibility checks. This may differ from the display version. */
 	public const MINECRAFT_VERSION_NETWORK = '%s';
+
+%s
 
 %s
 }
@@ -349,6 +360,37 @@ function check_removed_packets(array $packetToIdList, string $packetsDir) : void
  * @phpstan-param array<string, int> $packetToIdList
  */
 function generate_protocol_info(array $packetToIdList, int $protocolVersion, int $major, int $minor, int $patch, int $revision, bool $beta, string $packetsDir) : void{
+	$profileDefinitions = require __DIR__ . '/protocol-profiles.php';
+	if(!is_array($profileDefinitions)){
+		throw new \Error('Protocol profile configuration must return an array');
+	}
+
+	$currentProtocolName = sprintf('PROTOCOL_%d_%d_%d', $major, $minor, $patch);
+	$currentProfile = $profileDefinitions[$currentProtocolName] ?? null;
+	if(!is_array($currentProfile) || ($currentProfile['protocolId'] ?? null) !== $protocolVersion || !is_bool($currentProfile['accepted'] ?? null)){
+		throw new \Error("Missing or mismatched released profile $currentProtocolName (protocol $protocolVersion) in tools/protocol-profiles.php");
+	}
+
+	foreach($profileDefinitions as $name => $definition){
+		if(!is_string($name) || !is_array($definition) || !is_int($definition['protocolId'] ?? null) || !is_bool($definition['accepted'] ?? null)){
+			throw new \Error("Invalid definition for protocol profile $name");
+		}
+	}
+	uasort($profileDefinitions, static fn(array $a, array $b) : int => $b['protocolId'] <=> $a['protocolId']);
+	$protocolConstants = '';
+	$acceptedProfileDefinitions = [];
+	foreach($profileDefinitions as $name => $definition){
+		$protocolConstants .= sprintf("\tpublic const %s = %d;\n", $name, $definition['protocolId']);
+		if($definition['accepted']){
+			$acceptedProfileDefinitions[$name] = $definition;
+		}
+	}
+	uasort($acceptedProfileDefinitions, static fn(array $a, array $b) : int => $a['protocolId'] <=> $b['protocolId']);
+	$acceptedProtocolConstants = [];
+	foreach($acceptedProfileDefinitions as $name => $_definition){
+		$acceptedProtocolConstants[] = "\t\tself::$name,";
+	}
+
 	$consts = "";
 	$last = 0;
 
@@ -375,9 +417,11 @@ function generate_protocol_info(array $packetToIdList, int $protocolVersion, int
 	$gameVersionNetwork = sprintf("%d.%d.%d%s", $major, $minor, $patch, $beta ? ".$revision" : "");
 	file_put_contents($packetsDir . DIRECTORY_SEPARATOR . "ProtocolInfo.php", sprintf(
 		PROTOCOL_INFO_TEMPLATE,
-		$protocolVersion,
+		$currentProtocolName,
+		implode("\n", $acceptedProtocolConstants),
 		$gameVersion,
 		$gameVersionNetwork,
+		$protocolConstants,
 		$consts
 	));
 

@@ -58,8 +58,8 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 	 */
 	private ?array $blockActions = null;
 	private ?PlayerAuthInputVehicleInfo $vehicleInfo = null;
-	private float $analogMoveVecX;
-	private float $analogMoveVecZ;
+	private float $analogMoveVecX = 0.0;
+	private float $analogMoveVecZ = 0.0;
 	private Vector3 $cameraOrientation;
 	private Vector2 $rawMove;
 
@@ -354,8 +354,10 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 				$this->vehicleInfo = PlayerAuthInputVehicleInfo::read($in, $protocolId);
 			}
 		}
-		$this->analogMoveVecX = LE::readFloat($in);
-		$this->analogMoveVecZ = LE::readFloat($in);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_70){
+			$this->analogMoveVecX = LE::readFloat($in);
+			$this->analogMoveVecZ = LE::readFloat($in);
+		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_21_40){
 			$this->cameraOrientation = CommonTypes::getVector3($in);
 			if($protocolId >= ProtocolInfo::PROTOCOL_1_21_50){
@@ -437,8 +439,10 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 				$this->vehicleInfo->write($out, $protocolId);
 			}
 		}
-		LE::writeFloat($out, $this->analogMoveVecX);
-		LE::writeFloat($out, $this->analogMoveVecZ);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_70){
+			LE::writeFloat($out, $this->analogMoveVecX);
+			LE::writeFloat($out, $this->analogMoveVecZ);
+		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_21_40){
 			CommonTypes::putVector3($out, $this->cameraOrientation);
 			if($protocolId >= ProtocolInfo::PROTOCOL_1_21_50){
