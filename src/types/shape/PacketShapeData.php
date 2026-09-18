@@ -264,7 +264,7 @@ final class PacketShapeData{
 			$payload = match($payloadType){
 				PrimitiveShapeType::PAYLOAD_TYPE_NONE => null,
 				PrimitiveShapeType::PAYLOAD_TYPE_ARROW => PrimitiveShapeArrowPayload::read($in),
-				PrimitiveShapeType::PAYLOAD_TYPE_TEXT => PrimitiveShapeTextPayload::read($in),
+				PrimitiveShapeType::PAYLOAD_TYPE_TEXT => PrimitiveShapeTextPayload::read($in, $protocolId),
 				PrimitiveShapeType::PAYLOAD_TYPE_BOX => PrimitiveShapeBoxPayload::read($in),
 				PrimitiveShapeType::PAYLOAD_TYPE_LINE => PrimitiveShapeLinePayload::read($in),
 				PrimitiveShapeType::PAYLOAD_TYPE_CIRCLE_OR_SPHERE => PrimitiveShapeCircleOrSpherePayload::read($in),
@@ -287,7 +287,7 @@ final class PacketShapeData{
 				PrimitiveShapeType::LINE => $lineEndLocation !== null ? new PrimitiveShapeLinePayload($lineEndLocation) : null,
 				PrimitiveShapeType::BOX => $boxBound !== null ? new PrimitiveShapeBoxPayload($boxBound) : null,
 				PrimitiveShapeType::SPHERE, PrimitiveShapeType::CIRCLE => $segments !== null ? new PrimitiveShapeCircleOrSpherePayload($segments) : null,
-				PrimitiveShapeType::TEXT => $text !== null ? new PrimitiveShapeTextPayload($text, false, null, true, true, true) : null,
+				PrimitiveShapeType::TEXT => $text !== null ? new PrimitiveShapeTextPayload($text, false, null, 0.0, true, true, true) : null,
 				PrimitiveShapeType::ARROW => new PrimitiveShapeArrowPayload($lineEndLocation, $arrowHeadLength, $arrowHeadRadius, $segments),
 				default => throw new PacketDecodeException("Unknown shape type " . $shapeType->name)
 			};
@@ -314,10 +314,10 @@ final class PacketShapeData{
 		CommonTypes::writeOptional($out, $this->location, CommonTypes::putVector3(...));
 		CommonTypes::writeOptional($out, $this->scale, LE::writeFloat(...));
 		CommonTypes::writeOptional($out, $this->rotation, CommonTypes::putVector3(...));
+		CommonTypes::writeOptional($out, $this->totalTimeLeft, LE::writeFloat(...));
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_20){
-			CommonTypes::writeOptional($out, $this->totalTimeLeft, LE::writeFloat(...));
+			CommonTypes::writeOptional($out, $this->maximumRenderDistance, LE::writeFloat(...));
 		}
-		CommonTypes::writeOptional($out, $this->maximumRenderDistance, LE::writeFloat(...));
 		CommonTypes::writeOptional($out, $this->color, CommonTypes::writeColor(...));
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_21_120){
 			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_0){
@@ -328,7 +328,7 @@ final class PacketShapeData{
 			}
 
 			VarInt::writeUnsignedInt($out, $this->payload?->getTypeId() ?? PrimitiveShapeType::PAYLOAD_TYPE_NONE);
-			$this->payload?->write($out);
+			$this->payload?->write($out, $protocolId);
 		}else{
 			CommonTypes::writeOptional($out, $this->payload instanceof PrimitiveShapeTextPayload ? $this->payload->getText() : null, CommonTypes::putString(...));
 			CommonTypes::writeOptional($out, $this->payload instanceof PrimitiveShapeBoxPayload ? $this->payload->getBoxBound() : null, CommonTypes::putVector3(...));

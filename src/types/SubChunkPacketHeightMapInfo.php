@@ -19,6 +19,7 @@ use pmmp\encoding\ByteBufferReader;
 use pmmp\encoding\ByteBufferWriter;
 use pmmp\encoding\VarInt;
 use pocketmine\network\mcpe\protocol\PacketDecodeException;
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use function count;
 
 class SubChunkPacketHeightMapInfo{
@@ -43,10 +44,10 @@ class SubChunkPacketHeightMapInfo{
 		return $this->heights[(($z & 0xf) << 4) | ($x & 0xf)];
 	}
 
-	public static function read(ByteBufferReader $in) : self{
+	public static function read(ByteBufferReader $in, int $protocolId) : self{
 		$heights = [];
 		for($i = 0; $i < self::TOTAL_LENGTH; ++$i){
-			if(($i & (self::ROW_LENGTH - 1)) === 0){ //start of a new row
+			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50 && ($i & (self::ROW_LENGTH - 1)) === 0){ //start of a new row
 				$rowLength = VarInt::readUnsignedInt($in);
 				if($rowLength !== self::ROW_LENGTH){
 					throw new PacketDecodeException("Expected height map row to hold exactly " . self::ROW_LENGTH . " heights, got $rowLength");
@@ -57,9 +58,9 @@ class SubChunkPacketHeightMapInfo{
 		return new self($heights);
 	}
 
-	public function write(ByteBufferWriter $out) : void{
+	public function write(ByteBufferWriter $out, int $protocolId) : void{
 		foreach($this->heights as $i => $height){
-			if(($i & (self::ROW_LENGTH - 1)) === 0){ //start of a new row
+			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50 && ($i & (self::ROW_LENGTH - 1)) === 0){ //start of a new row
 				VarInt::writeUnsignedInt($out, self::ROW_LENGTH);
 			}
 			Byte::writeSigned($out, $height);

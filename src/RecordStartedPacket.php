@@ -40,12 +40,12 @@ class RecordStartedPacket extends DataPacket implements ClientboundPacket{
 
 	public function getServerSoundHandle() : int{ return $this->serverSoundHandle; }
 
-	protected function decodePayload(ByteBufferReader $in) : void{
+	protected function decodePayload(ByteBufferReader $in, int $protocolId) : void{
 		$this->blockPosition = CommonTypes::getBlockPosition($in);
 		$this->serverSoundHandle = LE::readUnsignedLong($in);
 	}
 
-	protected function encodePayload(ByteBufferWriter $out) : void{
+	protected function encodePayload(ByteBufferWriter $out, int $protocolId) : void{
 		CommonTypes::putBlockPosition($out, $this->blockPosition);
 		LE::writeUnsignedLong($out, $this->serverSoundHandle);
 	}

@@ -19,6 +19,7 @@ use pmmp\encoding\ByteBufferReader;
 use pmmp\encoding\ByteBufferWriter;
 use pmmp\encoding\LE;
 use pocketmine\math\Vector3;
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\CommonTypes;
 
 final class EntityDiagnosticTimingInfo{
@@ -44,30 +45,34 @@ final class EntityDiagnosticTimingInfo{
 
 	public function getDimension() : string{ return $this->dimension; }
 
-	public static function read(ByteBufferReader $in) : self{
+	public static function read(ByteBufferReader $in, int $protocolId) : self{
 		$displayName = CommonTypes::getString($in);
 		$entity = CommonTypes::getString($in);
 		$timeInNS = LE::readUnsignedLong($in);
 		$percentOfTotal = Byte::readUnsigned($in);
-		$position = CommonTypes::getVector3($in);
-		$dimension = CommonTypes::getString($in);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50){
+			$position = CommonTypes::getVector3($in);
+			$dimension = CommonTypes::getString($in);
+		}
 
 		return new self(
 			$displayName,
 			$entity,
 			$timeInNS,
 			$percentOfTotal,
-			$position,
-			$dimension
+			$position ?? Vector3::zero(),
+			$dimension ?? ""
 		);
 	}
 
-	public function write(ByteBufferWriter $out) : void{
+	public function write(ByteBufferWriter $out, int $protocolId) : void{
 		CommonTypes::putString($out, $this->displayName);
 		CommonTypes::putString($out, $this->entity);
 		LE::writeUnsignedLong($out, $this->timeInNS);
 		Byte::writeUnsigned($out, $this->percentOfTotal);
-		CommonTypes::putVector3($out, $this->position);
-		CommonTypes::putString($out, $this->dimension);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50){
+			CommonTypes::putVector3($out, $this->position);
+			CommonTypes::putString($out, $this->dimension);
+		}
 	}
 }

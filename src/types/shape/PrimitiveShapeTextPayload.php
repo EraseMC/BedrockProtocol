@@ -18,6 +18,7 @@ use pmmp\encoding\ByteBufferReader;
 use pmmp\encoding\ByteBufferWriter;
 use pmmp\encoding\LE;
 use pocketmine\color\Color;
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\CommonTypes;
 use pocketmine\network\mcpe\protocol\types\GetTypeIdFromConstTrait;
 
@@ -50,23 +51,27 @@ final class PrimitiveShapeTextPayload extends PrimitiveShapePayload{
 
 	public function hasShowTextBackface() : bool{ return $this->showTextBackface; }
 
-	public static function read(ByteBufferReader $in) : self{
+	public static function read(ByteBufferReader $in, int $protocolId) : self{
 		$text = CommonTypes::getString($in);
 		$useRotation = CommonTypes::getBool($in);
 		$backgroundColor = CommonTypes::readOptional($in, CommonTypes::readColor(...));
-		$lineGapHeight = LE::readFloat($in);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50){
+			$lineGapHeight = LE::readFloat($in);
+		}
 		$depthTest = CommonTypes::getBool($in);
 		$showBackface = CommonTypes::getBool($in);
 		$showTextBackface = CommonTypes::getBool($in);
 
-		return new self($text, $useRotation, $backgroundColor, $lineGapHeight, $depthTest, $showBackface, $showTextBackface);
+		return new self($text, $useRotation, $backgroundColor, $lineGapHeight ?? 0.0, $depthTest, $showBackface, $showTextBackface);
 	}
 
-	public function write(ByteBufferWriter $out) : void{
+	public function write(ByteBufferWriter $out, int $protocolId) : void{
 		CommonTypes::putString($out, $this->text);
 		CommonTypes::putBool($out, $this->useRotation);
 		CommonTypes::writeOptional($out, $this->backgroundColor, CommonTypes::writeColor(...));
-		LE::writeFloat($out, $this->lineGapHeight);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50){
+			LE::writeFloat($out, $this->lineGapHeight);
+		}
 		CommonTypes::putBool($out, $this->depthTest);
 		CommonTypes::putBool($out, $this->showBackface);
 		CommonTypes::putBool($out, $this->showTextBackface);
