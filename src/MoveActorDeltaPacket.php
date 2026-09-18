@@ -17,6 +17,7 @@ namespace pocketmine\network\mcpe\protocol;
 use pmmp\encoding\ByteBufferReader;
 use pmmp\encoding\ByteBufferWriter;
 use pmmp\encoding\LE;
+use pmmp\encoding\VarInt;
 use pocketmine\network\mcpe\protocol\serializer\CommonTypes;
 
 class MoveActorDeltaPacket extends DataPacket implements ClientboundPacket{
@@ -43,6 +44,8 @@ class MoveActorDeltaPacket extends DataPacket implements ClientboundPacket{
 	public bool $teleport = false; //force move in the docs
 	public bool $forceMoveLocalEntity = false; //force move local entity in the docs
 	public bool $forceCompletion = false;
+	/** Expected number of ticks before the next movement update, used for position interpolation duration on the client. */
+	public int $ticks;
 
 	/**
 	 * @generate-create-func
@@ -59,6 +62,7 @@ class MoveActorDeltaPacket extends DataPacket implements ClientboundPacket{
 		bool $teleport,
 		bool $forceMoveLocalEntity,
 		bool $forceCompletion,
+		int $ticks,
 	) : self{
 		$result = new self;
 		$result->actorRuntimeId = $actorRuntimeId;
@@ -72,6 +76,7 @@ class MoveActorDeltaPacket extends DataPacket implements ClientboundPacket{
 		$result->teleport = $teleport;
 		$result->forceMoveLocalEntity = $forceMoveLocalEntity;
 		$result->forceCompletion = $forceCompletion;
+		$result->ticks = $ticks;
 		return $result;
 	}
 
@@ -88,6 +93,7 @@ class MoveActorDeltaPacket extends DataPacket implements ClientboundPacket{
 			$this->teleport = CommonTypes::getBool($in);
 			$this->forceMoveLocalEntity = CommonTypes::getBool($in);
 			$this->forceCompletion = CommonTypes::getBool($in);
+			$this->ticks = $protocolId >= ProtocolInfo::PROTOCOL_1_26_50 ? VarInt::readUnsignedLong($in) : 0;
 		}else{
 			$flags = LE::readUnsignedShort($in);
 			$this->xPos = ($flags & self::FLAG_HAS_X) !== 0 ? LE::readFloat($in) : null;
@@ -100,6 +106,7 @@ class MoveActorDeltaPacket extends DataPacket implements ClientboundPacket{
 			$this->teleport = ($flags & self::FLAG_TELEPORT) !== 0;
 			$this->forceMoveLocalEntity = ($flags & self::FLAG_FORCE_MOVE_LOCAL_ENTITY) !== 0;
 			$this->forceCompletion = false;
+			$this->ticks = 0;
 		}
 	}
 
@@ -116,6 +123,9 @@ class MoveActorDeltaPacket extends DataPacket implements ClientboundPacket{
 			CommonTypes::putBool($out, $this->teleport);
 			CommonTypes::putBool($out, $this->forceMoveLocalEntity);
 			CommonTypes::putBool($out, $this->forceCompletion);
+			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50){
+				VarInt::writeUnsignedLong($out, $this->ticks);
+			}
 		}else{
 			$flags = 0;
 			$flags |= $this->xPos !== null ? self::FLAG_HAS_X : 0;

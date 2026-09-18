@@ -77,13 +77,13 @@ class BossEventPacket extends DataPacket implements ClientboundPacket, Serverbou
 		return self::base($bossActorUniqueId, self::TYPE_HIDE);
 	}
 
-	public static function registerPlayer(int $bossActorUniqueId, int $playerActorUniqueId) : self{
+	public static function registerPlayer(int $bossActorUniqueId, int $playerActorUniqueId = 0) : self{
 		$result = self::base($bossActorUniqueId, self::TYPE_REGISTER_PLAYER);
 		$result->playerActorUniqueId = $playerActorUniqueId;
 		return $result;
 	}
 
-	public static function unregisterPlayer(int $bossActorUniqueId, int $playerActorUniqueId) : self{
+	public static function unregisterPlayer(int $bossActorUniqueId, int $playerActorUniqueId = 0) : self{
 		$result = self::base($bossActorUniqueId, self::TYPE_UNREGISTER_PLAYER);
 		$result->playerActorUniqueId = $playerActorUniqueId;
 		return $result;
@@ -110,7 +110,7 @@ class BossEventPacket extends DataPacket implements ClientboundPacket, Serverbou
 		return $result;
 	}
 
-	public static function query(int $bossActorUniqueId, int $playerActorUniqueId) : self{
+	public static function query(int $bossActorUniqueId, int $playerActorUniqueId = 0) : self{
 		$result = self::base($bossActorUniqueId, self::TYPE_QUERY);
 		$result->playerActorUniqueId = $playerActorUniqueId;
 		return $result;
@@ -119,7 +119,9 @@ class BossEventPacket extends DataPacket implements ClientboundPacket, Serverbou
 	protected function decodePayload(ByteBufferReader $in, int $protocolId) : void{
 		$this->bossActorUniqueId = CommonTypes::getActorUniqueId($in);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_30){
-			$this->playerActorUniqueId = CommonTypes::getActorUniqueId($in);
+			if($protocolId < ProtocolInfo::PROTOCOL_1_26_50){
+				$this->playerActorUniqueId = CommonTypes::getActorUniqueId($in);
+			}
 			$this->eventType = Byte::readUnsigned($in);
 			$this->title = CommonTypes::getString($in);
 			$this->filteredTitle = CommonTypes::getString($in);
@@ -170,7 +172,9 @@ class BossEventPacket extends DataPacket implements ClientboundPacket, Serverbou
 	protected function encodePayload(ByteBufferWriter $out, int $protocolId) : void{
 		CommonTypes::putActorUniqueId($out, $this->bossActorUniqueId);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_30){
-			CommonTypes::putActorUniqueId($out, $this->playerActorUniqueId);
+			if($protocolId < ProtocolInfo::PROTOCOL_1_26_50){
+				CommonTypes::putActorUniqueId($out, $this->playerActorUniqueId);
+			}
 			Byte::writeUnsigned($out, $this->eventType);
 			CommonTypes::putString($out, $this->title);
 			CommonTypes::putString($out, $this->filteredTitle);

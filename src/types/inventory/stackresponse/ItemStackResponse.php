@@ -57,7 +57,9 @@ final class ItemStackResponse{
 	public static function read(ByteBufferReader $in, int $protocolId) : self{
 		$result = Byte::readUnsigned($in);
 		$requestId = CommonTypes::readItemStackRequestId($in);
-		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50){
+			$containerInfos = CommonTypes::readOptional($in, fn(ByteBufferReader $in) => CommonTypes::readList($in, fn(ByteBufferReader $in) => ItemStackResponseContainerInfo::read($in, $protocolId)));
+		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			$containerInfos = CommonTypes::readDoubleOptional($in, fn(ByteBufferReader $in) => CommonTypes::readList($in, fn(ByteBufferReader $in) => ItemStackResponseContainerInfo::read($in, $protocolId)));
 		}else{
 			$containerInfos = $result === self::RESULT_OK ?
@@ -71,7 +73,9 @@ final class ItemStackResponse{
 		Byte::writeUnsigned($out, $this->result);
 		CommonTypes::writeItemStackRequestId($out, $this->requestId);
 		$writeContainerInfo = fn(ByteBufferWriter $out, ItemStackResponseContainerInfo $v) => $v->write($out, $protocolId);
-		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50){
+			CommonTypes::writeOptional($out, $this->containerInfos, fn(ByteBufferWriter $out, array $list) => CommonTypes::writeList($out, $list, $writeContainerInfo));
+		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			CommonTypes::writeDoubleOptional($out, $this->containerInfos, fn(ByteBufferWriter $out, array $list) => CommonTypes::writeList($out, $list, $writeContainerInfo));
 		}elseif($this->result === self::RESULT_OK){
 			CommonTypes::writeList($out, $this->containerInfos ?? [], $writeContainerInfo);

@@ -27,16 +27,17 @@ use Ramsey\Uuid\UuidInterface;
 final class DimensionData{
 
 	public function __construct(
-		private int $maxHeight,
-		private int $minHeight,
+		private int $minimumY,
+		private int $heightRange,
 		private int $generator,
 		private int $dimensionType,
-		private ?UuidInterface $packId = null
+		private ?UuidInterface $packId,
+		private string $defaultBiome
 	){}
 
-	public function getMaxHeight() : int{ return $this->maxHeight; }
+	public function getMinimumY() : int{ return $this->minimumY; }
 
-	public function getMinHeight() : int{ return $this->minHeight; }
+	public function getHeightRange() : int{ return $this->heightRange; }
 
 	public function getGenerator() : int{ return $this->generator; }
 
@@ -44,9 +45,11 @@ final class DimensionData{
 
 	public function getPackId() : ?UuidInterface{ return $this->packId; }
 
+	public function getDefaultBiome() : string{ return $this->defaultBiome; }
+
 	public static function read(ByteBufferReader $in, int $protocolId) : self{
-		$maxHeight = VarInt::readSignedInt($in);
-		$minHeight = VarInt::readSignedInt($in);
+		$minimumY = VarInt::readSignedInt($in);
+		$heightRange = VarInt::readSignedInt($in);
 		$generator = VarInt::readSignedInt($in);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_20){
 			$dimensionType = VarInt::readSignedInt($in);
@@ -54,19 +57,25 @@ final class DimensionData{
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			$packId = CommonTypes::getUUID($in);
 		}
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50){
+			$defaultBiome = CommonTypes::getString($in);
+		}
 
-		return new self($maxHeight, $minHeight, $generator, $dimensionType ?? DimensionIds::OVERWORLD, $packId ?? null);
+		return new self($minimumY, $heightRange, $generator, $dimensionType ?? DimensionIds::OVERWORLD, $packId ?? null, $defaultBiome ?? "");
 	}
 
 	public function write(ByteBufferWriter $out, int $protocolId) : void{
-		VarInt::writeSignedInt($out, $this->maxHeight);
-		VarInt::writeSignedInt($out, $this->minHeight);
+		VarInt::writeSignedInt($out, $this->minimumY);
+		VarInt::writeSignedInt($out, $this->heightRange);
 		VarInt::writeSignedInt($out, $this->generator);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_20){
 			VarInt::writeSignedInt($out, $this->dimensionType);
 		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			CommonTypes::putUUID($out, $this->packId ?? throw new \InvalidArgumentException("packId must be set"));
+		}
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50){
+			CommonTypes::putString($out, $this->defaultBiome);
 		}
 	}
 }
