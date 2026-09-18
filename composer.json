@@ -1,7 +1,19 @@
 {
-    "name": "nethergamesmc/bedrock-protocol",
-    "description": "An implementation of the Minecraft: Bedrock Edition protocol in PHP",
+    "name": "erasemc/bedrock-protocol",
+    "description": "EraseMC's implementation of the Minecraft: Bedrock Edition protocol in PHP",
     "type": "library",
+    "homepage": "https://github.com/EraseMC/BedrockProtocol",
+    "support": {
+        "issues": "https://github.com/EraseMC/BedrockProtocol/issues",
+        "source": "https://github.com/EraseMC/BedrockProtocol"
+    },
+    "keywords": [
+        "erasemc",
+        "minecraft",
+        "bedrock",
+        "protocol",
+        "php"
+    ],
     "require": {
         "php": "^8.1",
         "ext-encoding": "~1.0.0",

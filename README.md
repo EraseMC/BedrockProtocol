@@ -1,7 +1,9 @@
-# BedrockProtocol
-[![CI](https://github.com/axolotl-pm/BedrockProtocol/actions/workflows/ci.yml/badge.svg)](https://github.com/axolotl-pm/BedrockProtocol/actions/workflows/ci.yml)
+# EraseMC BedrockProtocol
+[![CI](https://github.com/EraseMC/BedrockProtocol/actions/workflows/ci.yml/badge.svg)](https://github.com/EraseMC/BedrockProtocol/actions/workflows/ci.yml)
 
-An implementation of the Minecraft: Bedrock Edition protocol in PHP
+An EraseMC-maintained implementation of the Minecraft: Bedrock Edition protocol in PHP.
+
+This repository is part of the EraseMC Core stack and is published as `erasemc/bedrock-protocol`.
 
 This library implements all of the packets in the Minecraft: Bedrock Edition protocol, as well as a few extra things needed to support them.
 However, at the time of writing, it does _not_ include the following:
@@ -37,6 +39,6 @@ $batchPayload = $stream->getData();
 ```
 
 ## Footnotes
-This library is a little rough around the edges, since it's only ever been intended for PocketMine-MP usage. It's only recently that this mess has been separated from the core to allow it to be used by other things.
+This library is a little rough around the edges, since it originated as a component of PocketMine-MP. It is maintained separately by EraseMC so it can evolve with the EraseMC Core compatibility roadmap.
 This means that API changes might be in order, and your feedback would be nice to drive them.
 If you want to improve BedrockProtocol, please open issues with suggestions, or better, make pull requests.
