@@ -35,6 +35,7 @@ use pocketmine\network\mcpe\protocol\types\entity\BlockPosMetadataProperty;
 use pocketmine\network\mcpe\protocol\types\entity\ByteMetadataProperty;
 use pocketmine\network\mcpe\protocol\types\entity\CompoundTagMetadataProperty;
 use pocketmine\network\mcpe\protocol\types\entity\EntityLink;
+use pocketmine\network\mcpe\protocol\types\entity\EntityMetadataFlags;
 use pocketmine\network\mcpe\protocol\types\entity\FloatMetadataProperty;
 use pocketmine\network\mcpe\protocol\types\entity\IntMetadataProperty;
 use pocketmine\network\mcpe\protocol\types\entity\LongMetadataProperty;
@@ -695,7 +696,7 @@ final class CommonTypes{
 			$data[$key] = self::readMetadataProperty($in, $type);
 		}
 
-		return $data;
+		return EntityMetadataFlags::decode($data, $protocolId);
 	}
 
 	/** @throws DataDecodeException */
@@ -722,6 +723,7 @@ final class CommonTypes{
 	 * @phpstan-param array<int, MetadataProperty> $metadata
 	 */
 	public static function putEntityMetadata(ByteBufferWriter $out, int $protocolId, array $metadata) : void{
+		$metadata = EntityMetadataFlags::encode($metadata, $protocolId);
 		VarInt::writeUnsignedInt($out, count($metadata));
 		foreach($metadata as $key => $d){
 			VarInt::writeUnsignedInt($out, $key);

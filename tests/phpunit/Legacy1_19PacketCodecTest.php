@@ -20,6 +20,9 @@ use pmmp\encoding\ByteBufferWriter;
 use pocketmine\network\mcpe\protocol\serializer\CommonTypes;
 use pocketmine\network\mcpe\protocol\types\BlockPosition;
 use pocketmine\network\mcpe\protocol\types\CompressionAlgorithm;
+use pocketmine\network\mcpe\protocol\types\entity\EntityMetadataFlags;
+use pocketmine\network\mcpe\protocol\types\entity\EntityMetadataProperties;
+use pocketmine\network\mcpe\protocol\types\entity\LongMetadataProperty;
 use pocketmine\network\mcpe\protocol\types\inventory\ContainerUIIds;
 use pocketmine\network\mcpe\protocol\types\inventory\FullContainerName;
 use pocketmine\network\mcpe\protocol\types\recipe\IntIdMetaItemDescriptor;
@@ -147,5 +150,19 @@ final class Legacy1_19PacketCodecTest extends TestCase{
 		$container->write($new, ProtocolInfo::PROTOCOL_1_19_50);
 		self::assertSame(hex2bin('16'), $new->getData());
 		self::assertSame(ContainerUIIds::ENCHANTING_INPUT, FullContainerName::read(new ByteBufferReader($new->getData()), ProtocolInfo::PROTOCOL_1_19_50)->getContainerId());
+	}
+
+	public function testEntityFlagsCrossThe64BitBoundaryBefore1_19_50() : void{
+		$metadata = [
+			EntityMetadataProperties::FLAGS => new LongMetadataProperty((1 << EntityMetadataFlags::CAN_POWER_JUMP) | (1 << EntityMetadataFlags::CAN_DASH) | (1 << EntityMetadataFlags::LINGER)),
+			EntityMetadataProperties::FLAGS2 => new LongMetadataProperty(1),
+		];
+		$legacy = EntityMetadataFlags::encode($metadata, ProtocolInfo::PROTOCOL_1_19_40);
+		self::assertSame((1 << EntityMetadataFlags::CAN_POWER_JUMP) | (1 << EntityMetadataFlags::CAN_DASH) | (1 << 63), $legacy[EntityMetadataProperties::FLAGS]->getValue());
+		self::assertSame(0, $legacy[EntityMetadataProperties::FLAGS2]->getValue());
+		$decoded = EntityMetadataFlags::decode($legacy, ProtocolInfo::PROTOCOL_1_19_40);
+		self::assertSame((1 << EntityMetadataFlags::CAN_POWER_JUMP) | (1 << EntityMetadataFlags::LINGER), $decoded[EntityMetadataProperties::FLAGS]->getValue());
+		self::assertSame(1, $decoded[EntityMetadataProperties::FLAGS2]->getValue());
+		self::assertSame($metadata, EntityMetadataFlags::encode($metadata, ProtocolInfo::PROTOCOL_1_19_50));
 	}
 }

@@ -14,6 +14,9 @@ declare(strict_types=1);
 
 namespace pocketmine\network\mcpe\protocol\types\entity;
 
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
+use const PHP_INT_MAX;
+
 final class EntityMetadataFlags{
 
 	private function __construct(){
@@ -152,4 +155,55 @@ final class EntityMetadataFlags{
 	public const NOT_PICKABLE_FROM_INSIDE = 130;
 
 	public const NUMBER_OF_FLAGS = 131;
+
+	/**
+	 * Removes the CAN_DASH bit introduced in 1.19.50 and shifts later flags
+	 * across the FLAGS / FLAGS2 64-bit boundary for older clients.
+	 *
+	 * @param array<int, MetadataProperty> $metadata
+	 * @return array<int, MetadataProperty>
+	 */
+	public static function encode(array $metadata, int $protocolId) : array{
+		if($protocolId > ProtocolInfo::PROTOCOL_1_19_40){
+			return $metadata;
+		}
+		/** @var LongMetadataProperty $flag1Property */
+		$flag1Property = $metadata[EntityMetadataProperties::FLAGS] ?? new LongMetadataProperty(0);
+		/** @var LongMetadataProperty $flag2Property */
+		$flag2Property = $metadata[EntityMetadataProperties::FLAGS2] ?? new LongMetadataProperty(0);
+		$flag1 = $flag1Property->getValue();
+		$flag2 = $flag2Property->getValue();
+		if($flag1 === 0 && $flag2 === 0){
+			return $metadata;
+		}
+		$lowerMask = (1 << self::CAN_DASH) - 1;
+		$legacyFlag1 = ($flag1 & $lowerMask) | ((($flag1 >> (self::CAN_DASH + 1)) << self::CAN_DASH) & PHP_INT_MAX);
+		$legacyFlag1 |= ($flag2 & 1) << 63;
+		$legacyFlag2 = ($flag2 >> 1) & PHP_INT_MAX;
+		$metadata[EntityMetadataProperties::FLAGS] = new LongMetadataProperty($legacyFlag1);
+		$metadata[EntityMetadataProperties::FLAGS2] = new LongMetadataProperty($legacyFlag2);
+		return $metadata;
+	}
+
+	/**
+	 * @param array<int, MetadataProperty> $metadata
+	 * @return array<int, MetadataProperty>
+	 */
+	public static function decode(array $metadata, int $protocolId) : array{
+		if($protocolId > ProtocolInfo::PROTOCOL_1_19_40){
+			return $metadata;
+		}
+		/** @var LongMetadataProperty $flag1Property */
+		$flag1Property = $metadata[EntityMetadataProperties::FLAGS] ?? new LongMetadataProperty(0);
+		/** @var LongMetadataProperty $flag2Property */
+		$flag2Property = $metadata[EntityMetadataProperties::FLAGS2] ?? new LongMetadataProperty(0);
+		$flag1 = $flag1Property->getValue();
+		$flag2 = $flag2Property->getValue();
+		$lowerMask = (1 << self::CAN_DASH) - 1;
+		$currentFlag1 = ($flag1 & $lowerMask) | (($flag1 & ~$lowerMask) << 1);
+		$currentFlag2 = ($flag2 << 1) | (($flag1 >> 63) & 1);
+		$metadata[EntityMetadataProperties::FLAGS] = new LongMetadataProperty($currentFlag1);
+		$metadata[EntityMetadataProperties::FLAGS2] = new LongMetadataProperty($currentFlag2);
+		return $metadata;
+	}
 }
