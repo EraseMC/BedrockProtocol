@@ -637,7 +637,7 @@ final class CommonTypes{
 					VarInt::writeSignedInt($out, $ingredient->getCount());
 				}
 			}elseif($descriptor === null){
-				new IntIdMetaItemDescriptor(0, 0)->write($out, $protocolId);
+				(new IntIdMetaItemDescriptor(0, 0))->write($out, $protocolId);
 			}else{
 				throw new \InvalidArgumentException('Only integer item descriptors can be sent before protocol 1.19.30');
 			}
