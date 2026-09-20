@@ -23,7 +23,7 @@ final class SmithingTransformRecipe{
 
 	public function __construct(
 		private string $recipeId,
-		private RecipeIngredient $template,
+		private ?RecipeIngredient $template,
 		private RecipeIngredient $input,
 		private RecipeIngredient $addition,
 		private ItemStack $output,
@@ -33,7 +33,7 @@ final class SmithingTransformRecipe{
 
 	public function getRecipeId() : string{ return $this->recipeId; }
 
-	public function getTemplate() : RecipeIngredient{ return $this->template; }
+	public function getTemplate() : ?RecipeIngredient{ return $this->template; }
 
 	public function getInput() : RecipeIngredient{ return $this->input; }
 
@@ -47,7 +47,7 @@ final class SmithingTransformRecipe{
 
 	public static function decode(ByteBufferReader $in, int $protocolId) : self{
 		$recipeId = CommonTypes::getString($in);
-		$template = CommonTypes::getRecipeIngredient($in, $protocolId);
+		$template = $protocolId >= ProtocolInfo::PROTOCOL_1_19_80 ? CommonTypes::getRecipeIngredient($in, $protocolId) : null;
 		$input = CommonTypes::getRecipeIngredient($in, $protocolId);
 		$addition = CommonTypes::getRecipeIngredient($in, $protocolId);
 		$output = CommonTypes::getItemStackWithoutStackId($in, $protocolId);
@@ -67,7 +67,9 @@ final class SmithingTransformRecipe{
 
 	public function encode(ByteBufferWriter $out, int $protocolId) : void{
 		CommonTypes::putString($out, $this->recipeId);
-		CommonTypes::putRecipeIngredient($out, $protocolId, $this->template);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_80){
+			CommonTypes::putRecipeIngredient($out, $protocolId, $this->template ?? throw new \InvalidArgumentException('Smithing transform recipes require a template on protocol 1.19.80+'));
+		}
 		CommonTypes::putRecipeIngredient($out, $protocolId, $this->input);
 		CommonTypes::putRecipeIngredient($out, $protocolId, $this->addition);
 		CommonTypes::putItemStackWithoutStackId($out, $protocolId, $this->output);

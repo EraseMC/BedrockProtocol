@@ -33,6 +33,9 @@ final class FullContainerName{
 
 	public static function read(ByteBufferReader $in, int $protocolId) : self{
 		$containerId = Byte::readUnsigned($in);
+		if($protocolId < ProtocolInfo::PROTOCOL_1_19_50 && $containerId >= ContainerUIIds::RECIPE_BOOK){
+			++$containerId;
+		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_21_30){
 			$dynamicId = CommonTypes::readOptional($in, LE::readUnsignedInt(...));
 		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_21_20){
@@ -42,7 +45,16 @@ final class FullContainerName{
 	}
 
 	public function write(ByteBufferWriter $out, int $protocolId) : void{
-		Byte::writeUnsigned($out, $this->containerId);
+		$containerId = $this->containerId;
+		if($protocolId < ProtocolInfo::PROTOCOL_1_19_50){
+			if($containerId === ContainerUIIds::RECIPE_BOOK){
+				throw new \InvalidArgumentException('Recipe book container does not exist before protocol 1.19.50');
+			}
+			if($containerId > ContainerUIIds::RECIPE_BOOK){
+				--$containerId;
+			}
+		}
+		Byte::writeUnsigned($out, $containerId);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_21_30){
 			CommonTypes::writeOptional($out, $this->dynamicId, LE::writeUnsignedInt(...));
 		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_21_20){

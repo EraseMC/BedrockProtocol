@@ -17,8 +17,13 @@ namespace pocketmine\network\mcpe\protocol;
 use PHPUnit\Framework\TestCase;
 use pmmp\encoding\ByteBufferReader;
 use pmmp\encoding\ByteBufferWriter;
+use pocketmine\network\mcpe\protocol\serializer\CommonTypes;
 use pocketmine\network\mcpe\protocol\types\BlockPosition;
 use pocketmine\network\mcpe\protocol\types\CompressionAlgorithm;
+use pocketmine\network\mcpe\protocol\types\inventory\ContainerUIIds;
+use pocketmine\network\mcpe\protocol\types\inventory\FullContainerName;
+use pocketmine\network\mcpe\protocol\types\recipe\IntIdMetaItemDescriptor;
+use pocketmine\network\mcpe\protocol\types\recipe\RecipeIngredient;
 
 /**
  * Wire-format regression tests for stable 1.19 protocol boundaries.
@@ -95,5 +100,52 @@ final class Legacy1_19PacketCodecTest extends TestCase{
 		$decoded->decode(new ByteBufferReader(hex2bin('4510')), ProtocolInfo::PROTOCOL_1_19_70);
 		self::assertSame(8, $decoded->radius);
 		self::assertSame(0, $decoded->maxRadius);
+	}
+
+	public function testAdventureSettingsUsesLegacyFixedLittleEndianActorId() : void{
+		$packet = AdventureSettingsPacket::create(1, 2, 3, 4, 5, -2);
+		self::assertSame(hex2bin('370102030405feffffffffffffff'), self::encode($packet, ProtocolInfo::PROTOCOL_1_19_0));
+
+		$decoded = new AdventureSettingsPacket();
+		$decoded->decode(new ByteBufferReader(hex2bin('370102030405feffffffffffffff')), ProtocolInfo::PROTOCOL_1_19_0);
+		self::assertSame(-2, $decoded->targetActorUniqueId);
+
+		$flags = AdventureSettingsPacket::create(0, 0, 0, 0, 0, 0);
+		$flags->setFlag(AdventureSettingsPacket::MINE, true);
+		self::assertSame(1, $flags->flags2);
+		self::assertTrue($flags->getFlag(AdventureSettingsPacket::MINE));
+	}
+
+	public function testRecipeIngredientsUseThePre1_19_30IntegerFormat() : void{
+		$ingredient = new RecipeIngredient(new IntIdMetaItemDescriptor(2, 3), 4);
+
+		$old = new ByteBufferWriter();
+		CommonTypes::putRecipeIngredient($old, ProtocolInfo::PROTOCOL_1_19_21, $ingredient);
+		self::assertSame(hex2bin('040608'), $old->getData());
+
+		$new = new ByteBufferWriter();
+		CommonTypes::putRecipeIngredient($new, ProtocolInfo::PROTOCOL_1_19_30, $ingredient);
+		self::assertSame(hex2bin('010200030008'), $new->getData());
+
+		$decoded = CommonTypes::getRecipeIngredient(new ByteBufferReader(hex2bin('040608')), ProtocolInfo::PROTOCOL_1_19_21);
+		self::assertInstanceOf(IntIdMetaItemDescriptor::class, $decoded->getDescriptor());
+		self::assertSame(4, $decoded->getCount());
+
+		$air = new ByteBufferWriter();
+		CommonTypes::putRecipeIngredient($air, ProtocolInfo::PROTOCOL_1_19_21, new RecipeIngredient(new IntIdMetaItemDescriptor(0, 0), 64));
+		self::assertSame(hex2bin('00'), $air->getData());
+	}
+
+	public function testContainerIdsShiftBefore1_19_50() : void{
+		$container = new FullContainerName(ContainerUIIds::ENCHANTING_INPUT);
+		$old = new ByteBufferWriter();
+		$container->write($old, ProtocolInfo::PROTOCOL_1_19_40);
+		self::assertSame(hex2bin('15'), $old->getData());
+		self::assertSame(ContainerUIIds::ENCHANTING_INPUT, FullContainerName::read(new ByteBufferReader($old->getData()), ProtocolInfo::PROTOCOL_1_19_40)->getContainerId());
+
+		$new = new ByteBufferWriter();
+		$container->write($new, ProtocolInfo::PROTOCOL_1_19_50);
+		self::assertSame(hex2bin('16'), $new->getData());
+		self::assertSame(ContainerUIIds::ENCHANTING_INPUT, FullContainerName::read(new ByteBufferReader($new->getData()), ProtocolInfo::PROTOCOL_1_19_50)->getContainerId());
 	}
 }

@@ -105,7 +105,7 @@ final class ItemStackRequest{
 			return self::readAction($in, $protocolId, $typeId);
 		});
 		$filterStrings = CommonTypes::readList($in, CommonTypes::getString(...));
-		$filterStringCause = LE::readSignedInt($in);
+		$filterStringCause = $protocolId >= ProtocolInfo::PROTOCOL_1_19_30 ? LE::readSignedInt($in) : 0;
 		return new self($requestId, $actions, $filterStrings, $filterStringCause);
 	}
 
@@ -119,6 +119,8 @@ final class ItemStackRequest{
 			$action->write($out, $protocolId);
 		});
 		CommonTypes::writeList($out, $this->filterStrings, CommonTypes::putString(...));
-		LE::writeSignedInt($out, $this->filterStringCause);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_30){
+			LE::writeSignedInt($out, $this->filterStringCause);
+		}
 	}
 }

@@ -525,6 +525,22 @@ foreach($json["packets"] as $name => $id){
 	}
 	$packetToIdList[$name] = $id;
 }
+$legacyPackets = require __DIR__ . '/legacy-packets.php';
+if(!is_array($legacyPackets)){
+	fwrite(STDERR, "Legacy packet configuration must return an array" . PHP_EOL);
+	exit(1);
+}
+foreach($legacyPackets as $name => $id){
+	if(!is_string($name) || !is_int($id)){
+		fwrite(STDERR, "Invalid legacy packet configuration entry" . PHP_EOL);
+		exit(1);
+	}
+	if(isset($packetToIdList[$name])){
+		fwrite(STDERR, "Legacy packet $name is already present in protocol_info.json" . PHP_EOL);
+		exit(1);
+	}
+	$packetToIdList[$name] = $id;
+}
 asort($packetToIdList, SORT_NUMERIC);
 
 $packetsDir = dirname(__DIR__) . '/src/';

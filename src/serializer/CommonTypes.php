@@ -243,7 +243,7 @@ final class CommonTypes{
 		$persona = self::getBool($in);
 		$capeOnClassic = self::getBool($in);
 		$isPrimaryUser = self::getBool($in);
-		$override = self::getBool($in);
+		$override = $protocolId >= ProtocolInfo::PROTOCOL_1_19_63 ? self::getBool($in) : true;
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			$trustedSkinFlag = self::getString($in);
 			$profileHash = self::getString($in);
@@ -345,7 +345,9 @@ final class CommonTypes{
 		self::putBool($out, $skin->isPersona());
 		self::putBool($out, $skin->isPersonaCapeOnClassic());
 		self::putBool($out, $skin->isPrimaryUser());
-		self::putBool($out, $skin->isOverride());
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_63){
+			self::putBool($out, $skin->isOverride());
+		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			self::putString($out, $skin->getTrustedSkinFlag());
 			self::putString($out, $skin->getProfileHash());
@@ -614,13 +616,33 @@ final class CommonTypes{
 
 	/** @throws DataDecodeException */
 	public static function getRecipeIngredient(ByteBufferReader $in, int $protocolId) : RecipeIngredient{
-		$descriptor = self::readItemDescriptorMess($in, $protocolId);
-		$count = VarInt::readSignedInt($in);
+		if($protocolId < ProtocolInfo::PROTOCOL_1_19_30){
+			$descriptor = IntIdMetaItemDescriptor::read($in, $protocolId);
+			$count = $descriptor->getId() === 0 ? 0 : VarInt::readSignedInt($in);
+		}else{
+			$descriptor = self::readItemDescriptorMess($in, $protocolId);
+			$count = VarInt::readSignedInt($in);
+		}
 
 		return new RecipeIngredient($descriptor, $count);
 	}
 
 	public static function putRecipeIngredient(ByteBufferWriter $out, int $protocolId, RecipeIngredient $ingredient) : void{
+		if($protocolId < ProtocolInfo::PROTOCOL_1_19_30){
+			$descriptor = $ingredient->getDescriptor();
+			if($descriptor instanceof IntIdMetaItemDescriptor){
+				$descriptor->write($out, $protocolId);
+				if($descriptor->getId() !== 0){
+					VarInt::writeSignedInt($out, $ingredient->getCount());
+				}
+			}elseif($descriptor === null){
+				new IntIdMetaItemDescriptor(0, 0)->write($out, $protocolId);
+			}else{
+				throw new \InvalidArgumentException('Only integer item descriptors can be sent before protocol 1.19.30');
+			}
+			return;
+		}
+
 		self::writeItemDescriptorMess($out, $protocolId, $ingredient->getDescriptor());
 		VarInt::writeSignedInt($out, $ingredient->getCount());
 	}

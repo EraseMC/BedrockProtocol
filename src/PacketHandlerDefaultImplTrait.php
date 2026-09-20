@@ -234,6 +234,10 @@ trait PacketHandlerDefaultImplTrait{
 		return false;
 	}
 
+	public function handleAdventureSettings(AdventureSettingsPacket $packet) : bool{
+		return false;
+	}
+
 	public function handleBlockActorData(BlockActorDataPacket $packet) : bool{
 		return false;
 	}
