@@ -18,6 +18,18 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class ProtocolInfoTest extends TestCase{
+	/** @phpstan-return \Generator<string, array{int, int}> */
+	public static function stable1_18ProtocolProvider() : \Generator{
+		yield '1.18.0' => [ProtocolInfo::PROTOCOL_1_18_0, 475];
+		yield '1.18.10' => [ProtocolInfo::PROTOCOL_1_18_10, 486];
+		yield '1.18.30' => [ProtocolInfo::PROTOCOL_1_18_30, 503];
+	}
+
+	#[DataProvider('stable1_18ProtocolProvider')]
+	public function testStable1_18ProtocolConstants(int $actual, int $expected) : void{
+		self::assertSame($expected, $actual);
+		self::assertContains($actual, ProtocolInfo::ACCEPTED_PROTOCOL);
+	}
 
 	public function testMinecraftVersionNetwork() : void{
 		self::assertMatchesRegularExpression(

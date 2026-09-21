@@ -24,6 +24,9 @@ declare(strict_types=1);
  * @return array<string, array{protocolId: int, accepted: bool}>
  */
 return [
+	'PROTOCOL_1_18_0' => ['protocolId' => 475, 'accepted' => true],
+	'PROTOCOL_1_18_10' => ['protocolId' => 486, 'accepted' => true],
+	'PROTOCOL_1_18_30' => ['protocolId' => 503, 'accepted' => true],
 	'PROTOCOL_1_19_0' => ['protocolId' => 527, 'accepted' => false],
 	'PROTOCOL_1_19_10' => ['protocolId' => 534, 'accepted' => false],
 	'PROTOCOL_1_19_20' => ['protocolId' => 544, 'accepted' => false],
