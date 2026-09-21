@@ -15,18 +15,18 @@ declare(strict_types=1);
 /*
  * Named released protocol profiles used by ProtocolInfo generation.
  *
- * The second value controls whether a profile is advertised in
- * ProtocolInfo::ACCEPTED_PROTOCOL. A profile must remain false until its
- * transport, data translation, packet codecs, and client compatibility matrix
- * have passed their release gates. Preview protocol IDs are deliberately not
- * listed here.
+ * The second value controls whether a profile is admitted by
+ * ProtocolInfo::ACCEPTED_PROTOCOL. Release verification status is recorded in
+ * the core repository's legacy-protocol documentation; admission alone is not
+ * evidence that every client/profile has passed live testing. Preview protocol
+ * IDs are deliberately not listed here.
  *
  * @return array<string, array{protocolId: int, accepted: bool}>
  */
 return [
-	'PROTOCOL_1_18_0' => ['protocolId' => 475, 'accepted' => false],
-	'PROTOCOL_1_18_10' => ['protocolId' => 486, 'accepted' => false],
-	'PROTOCOL_1_18_30' => ['protocolId' => 503, 'accepted' => false],
+	'PROTOCOL_1_18_0' => ['protocolId' => 475, 'accepted' => true],
+	'PROTOCOL_1_18_10' => ['protocolId' => 486, 'accepted' => true],
+	'PROTOCOL_1_18_30' => ['protocolId' => 503, 'accepted' => true],
 	'PROTOCOL_1_19_0' => ['protocolId' => 527, 'accepted' => false],
 	'PROTOCOL_1_19_10' => ['protocolId' => 534, 'accepted' => false],
 	'PROTOCOL_1_19_20' => ['protocolId' => 544, 'accepted' => false],

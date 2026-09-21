@@ -34,11 +34,14 @@ final class ProtocolInfo{
 	/** Actual Minecraft: PE protocol version */
 	public const CURRENT_PROTOCOL = self::PROTOCOL_1_26_50;
 	/**
-	 * Profiles which have passed EraseMC's compatibility gates and may be
-	 * accepted by the server. This list intentionally differs from the full
-	 * set of named protocol profiles below.
+	 * Profiles admitted by the server. Admission does not imply complete live
+	 * compatibility testing; see the core repository's legacy-protocol notes.
+	 * This list differs from the full set of named profiles below.
 	 */
 	public const ACCEPTED_PROTOCOL = [
+		self::PROTOCOL_1_18_0,
+		self::PROTOCOL_1_18_10,
+		self::PROTOCOL_1_18_30,
 		self::PROTOCOL_1_20_0,
 		self::PROTOCOL_1_20_10,
 		self::PROTOCOL_1_20_30,

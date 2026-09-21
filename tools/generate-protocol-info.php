@@ -265,9 +265,9 @@ final class ProtocolInfo{
 	/** Actual Minecraft: PE protocol version */
 	public const CURRENT_PROTOCOL = self::%s;
 	/**
-	 * Profiles which have passed EraseMC's compatibility gates and may be
-	 * accepted by the server. This list intentionally differs from the full
-	 * set of named protocol profiles below.
+	 * Profiles admitted by the server. Admission does not imply complete live
+	 * compatibility testing; see the core repository's legacy-protocol notes.
+	 * This list differs from the full set of named profiles below.
 	 */
 	public const ACCEPTED_PROTOCOL = [
 %s

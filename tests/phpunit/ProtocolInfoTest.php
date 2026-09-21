@@ -28,7 +28,7 @@ final class ProtocolInfoTest extends TestCase{
 	#[DataProvider('stable1_18ProtocolProvider')]
 	public function testStable1_18ProtocolConstants(int $actual, int $expected) : void{
 		self::assertSame($expected, $actual);
-		self::assertNotContains($actual, ProtocolInfo::ACCEPTED_PROTOCOL);
+		self::assertContains($actual, ProtocolInfo::ACCEPTED_PROTOCOL);
 	}
 
 	public function testMinecraftVersionNetwork() : void{
