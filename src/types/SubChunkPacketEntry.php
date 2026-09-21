@@ -18,6 +18,7 @@ use pmmp\encoding\Byte;
 use pmmp\encoding\ByteBufferReader;
 use pmmp\encoding\ByteBufferWriter;
 use pmmp\encoding\LE;
+use pmmp\encoding\VarInt;
 use pocketmine\network\mcpe\protocol\PacketDecodeException;
 use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\CommonTypes;
@@ -62,6 +63,14 @@ final class SubChunkPacketEntry{
 	public function getUsedBlobHash() : ?int{ return $this->usedBlobHash; }
 
 	public static function read(ByteBufferReader $in, int $protocolId, bool $cacheEnabled) : self{
+		if($protocolId < ProtocolInfo::PROTOCOL_1_18_10){
+			$terrainData = CommonTypes::getString($in);
+			$requestResult = VarInt::readSignedInt($in);
+			$heightMapType = Byte::readUnsigned($in);
+			$heightMapData = $heightMapType === SubChunkPacketHeightMapType::DATA ? SubChunkPacketHeightMapInfo::read($in, $protocolId) : null;
+			$blobHash = $cacheEnabled && CommonTypes::getBool($in) ? LE::readUnsignedLong($in) : null;
+			return new self(new SubChunkPositionOffset(0, 0, 0), $requestResult, $terrainData, $heightMapType, $heightMapData, SubChunkPacketHeightMapType::ALL_COPIED, null, $blobHash);
+		}
 		$offset = SubChunkPositionOffset::read($in);
 
 		$requestResult = Byte::readUnsigned($in);
@@ -124,6 +133,19 @@ final class SubChunkPacketEntry{
 	}
 
 	public function write(ByteBufferWriter $out, int $protocolId, bool $cacheEnabled) : void{
+		if($protocolId < ProtocolInfo::PROTOCOL_1_18_10){
+			CommonTypes::putString($out, $this->terrainData ?? "");
+			VarInt::writeSignedInt($out, $this->requestResult);
+			Byte::writeUnsigned($out, $this->heightMapType);
+			$this->heightMapData?->write($out, $protocolId);
+			if($cacheEnabled){
+				CommonTypes::putBool($out, $this->usedBlobHash !== null);
+				if($this->usedBlobHash !== null){
+					LE::writeUnsignedLong($out, $this->usedBlobHash);
+				}
+			}
+			return;
+		}
 		$this->offset->write($out);
 
 		Byte::writeUnsigned($out, $this->requestResult);

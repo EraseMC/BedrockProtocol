@@ -109,7 +109,10 @@ class LevelChunkPacket extends DataPacket implements ClientboundPacket{
 			$this->dimensionId = VarInt::readSignedInt($in);
 		}
 
-		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+		if($protocolId < ProtocolInfo::PROTOCOL_1_18_10){
+			$this->subChunkCount = VarInt::readUnsignedInt($in);
+			$this->subChunkRequestLimit = null;
+		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			$this->subChunkCount = VarInt::readUnsignedInt($in);
 			$this->subChunkRequestLimit = CommonTypes::readOptional($in, VarInt::readSignedInt(...));
 		}else{
@@ -147,7 +150,9 @@ class LevelChunkPacket extends DataPacket implements ClientboundPacket{
 			VarInt::writeSignedInt($out, $this->dimensionId);
 		}
 
-		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+		if($protocolId < ProtocolInfo::PROTOCOL_1_18_10){
+			VarInt::writeUnsignedInt($out, $this->subChunkCount);
+		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			VarInt::writeUnsignedInt($out, $this->subChunkCount);
 			CommonTypes::writeOptional($out, $this->subChunkRequestLimit, VarInt::writeSignedInt(...));
 		}elseif($this->subChunkRequestLimit === null){

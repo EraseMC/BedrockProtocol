@@ -97,6 +97,9 @@ final class ItemStackRequest{
 				}
 			}else{
 				$innerTypeId = Byte::readUnsigned($in);
+				if($protocolId < ProtocolInfo::PROTOCOL_1_18_10 && $innerTypeId >= ItemStackRequestActionType::INNER_TYPES[ItemStackRequestActionType::LAB_TABLE_COMBINE]){
+					$innerTypeId += 2;
+				}
 				$typeId = array_search($innerTypeId, ItemStackRequestActionType::INNER_TYPES, true);
 				if($typeId === false){
 					throw new PacketDecodeException("Unhandled item stack request action type $innerTypeId");
@@ -115,7 +118,11 @@ final class ItemStackRequest{
 			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 				VarInt::writeUnsignedInt($out, $action->getTypeId());
 			}
-			Byte::writeUnsigned($out, ItemStackRequestActionType::INNER_TYPES[$action->getTypeId()]);
+			$innerTypeId = ItemStackRequestActionType::INNER_TYPES[$action->getTypeId()];
+			if($protocolId < ProtocolInfo::PROTOCOL_1_18_10 && $innerTypeId >= ItemStackRequestActionType::INNER_TYPES[ItemStackRequestActionType::LAB_TABLE_COMBINE]){
+				$innerTypeId -= 2;
+			}
+			Byte::writeUnsigned($out, $innerTypeId);
 			$action->write($out, $protocolId);
 		});
 		CommonTypes::writeList($out, $this->filterStrings, CommonTypes::putString(...));
