@@ -960,7 +960,7 @@ final class CommonTypes{
 
 		$result->ignoreEntities = self::getBool($in);
 		$result->ignoreBlocks = self::getBool($in);
-		$result->allowNonTickingChunks = self::getBool($in);
+		$result->allowNonTickingChunks = $protocolId >= ProtocolInfo::PROTOCOL_1_18_30 && self::getBool($in);
 
 		$result->dimensions = self::getBlockPosition($in, $protocolId >= ProtocolInfo::PROTOCOL_1_26_10);
 		$result->offset = self::getBlockPosition($in, $protocolId >= ProtocolInfo::PROTOCOL_1_26_10);
@@ -982,7 +982,9 @@ final class CommonTypes{
 
 		self::putBool($out, $structureSettings->ignoreEntities);
 		self::putBool($out, $structureSettings->ignoreBlocks);
-		self::putBool($out, $structureSettings->allowNonTickingChunks);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_18_30){
+			self::putBool($out, $structureSettings->allowNonTickingChunks);
+		}
 
 		self::putBlockPosition($out, $structureSettings->dimensions, $protocolId >= ProtocolInfo::PROTOCOL_1_26_10);
 		self::putBlockPosition($out, $structureSettings->offset, $protocolId >= ProtocolInfo::PROTOCOL_1_26_10);
