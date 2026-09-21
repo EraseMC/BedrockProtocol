@@ -63,9 +63,9 @@ class SubChunkPacket extends DataPacket implements ClientboundPacket{
 
 	protected function decodePayload(ByteBufferReader $in, int $protocolId) : void{
 		$newSubChunkFormat = $protocolId >= ProtocolInfo::PROTOCOL_1_18_10;
-		$this->cacheEnabled = $newSubChunkFormat ? CommonTypes::getBool($in) : $protocolId === ProtocolInfo::PROTOCOL_1_18_0;
+		$this->cacheEnabled = $newSubChunkFormat ? CommonTypes::getBool($in) : false;
 		$this->dimension = VarInt::readSignedInt($in);
-		$this->baseSubChunkPosition = $newSubChunkFormat ? SubChunkPosition::read($in, $protocolId < ProtocolInfo::PROTOCOL_1_26_40) : new SubChunkPosition(0, 0, 0);
+		$this->baseSubChunkPosition = SubChunkPosition::read($in, $protocolId < ProtocolInfo::PROTOCOL_1_26_40);
 
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			$this->entries = CommonTypes::readList($in, fn(ByteBufferReader $in) => SubChunkPacketEntry::read($in, $protocolId, $this->cacheEnabled));
@@ -75,7 +75,8 @@ class SubChunkPacket extends DataPacket implements ClientboundPacket{
 				$this->entries[] = SubChunkPacketEntry::read($in, $protocolId, $this->cacheEnabled);
 			}
 		}else{
-			$this->entries = [SubChunkPacketEntry::read($in, $protocolId, $this->cacheEnabled)];
+			$this->entries = [SubChunkPacketEntry::read($in, $protocolId, true)];
+			$this->cacheEnabled = $this->entries[0]->getUsedBlobHash() !== null;
 		}
 	}
 
@@ -83,21 +84,20 @@ class SubChunkPacket extends DataPacket implements ClientboundPacket{
 		$newSubChunkFormat = $protocolId >= ProtocolInfo::PROTOCOL_1_18_10;
 		if($newSubChunkFormat){
 			CommonTypes::putBool($out, $this->cacheEnabled);
-		}elseif($this->cacheEnabled && $protocolId !== ProtocolInfo::PROTOCOL_1_18_0){
-			throw new \InvalidArgumentException("SubChunkPacket caching is unsupported before 1.18.0");
 		}
 		VarInt::writeSignedInt($out, $this->dimension);
-		if($newSubChunkFormat){
-			$this->baseSubChunkPosition->write($out, $protocolId < ProtocolInfo::PROTOCOL_1_26_40);
-		}
+		$this->baseSubChunkPosition->write($out, $protocolId < ProtocolInfo::PROTOCOL_1_26_40);
 
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			CommonTypes::writeList($out, $this->entries, fn(ByteBufferWriter $out, SubChunkPacketEntry $v) => $v->write($out, $protocolId, $this->cacheEnabled));
 		}elseif($newSubChunkFormat){
 			LE::writeUnsignedInt($out, count($this->entries));
 		}
+		if(!$newSubChunkFormat && count($this->entries) !== 1){
+			throw new \InvalidArgumentException("SubChunkPacket requires exactly one entry before 1.18.10");
+		}
 		foreach($this->entries as $entry){
-			$entry->write($out, $protocolId, $this->cacheEnabled);
+			$entry->write($out, $protocolId, $newSubChunkFormat ? $this->cacheEnabled : true);
 		}
 	}
 

@@ -9,6 +9,9 @@ use pmmp\encoding\ByteBufferReader;
 use pmmp\encoding\ByteBufferWriter;
 use pocketmine\network\mcpe\protocol\types\SubChunkPosition;
 use pocketmine\network\mcpe\protocol\types\SubChunkPositionOffset;
+use pocketmine\network\mcpe\protocol\types\SubChunkPacketEntry;
+use pocketmine\network\mcpe\protocol\types\SubChunkPacketHeightMapType;
+use pocketmine\network\mcpe\protocol\types\SubChunkRequestResult;
 
 /** Wire-format regression tests for the stable Minecraft 1.18 boundaries. */
 final class Legacy1_18PacketCodecTest extends TestCase{
@@ -34,5 +37,20 @@ final class Legacy1_18PacketCodecTest extends TestCase{
 		self::assertSame(0x26, AvailableCommandsPacket::convertArg(ProtocolInfo::PROTOCOL_1_18_30, AvailableCommandsPacket::ARG_TYPE_STRING));
 		self::assertSame(0x28, AvailableCommandsPacket::convertArg(ProtocolInfo::PROTOCOL_1_18_10, AvailableCommandsPacket::ARG_TYPE_POSITION));
 		self::assertSame(0x2f, AvailableCommandsPacket::convertArg(ProtocolInfo::PROTOCOL_1_18_30, AvailableCommandsPacket::ARG_TYPE_POSITION));
+	}
+
+	public function test1_18_0SubChunkResponseRetainsAbsolutePosition() : void{
+		$position = new SubChunkPosition(1, -4, 2);
+		$entry = new SubChunkPacketEntry(new SubChunkPositionOffset(0, 0, 0), SubChunkRequestResult::SUCCESS, '', SubChunkPacketHeightMapType::NO_DATA, null, SubChunkPacketHeightMapType::ALL_COPIED, null, null);
+		$packet = SubChunkPacket::create(false, 0, $position, [$entry]);
+		$wire = hex2bin('ae010002070400020000');
+		self::assertSame($wire, self::encode($packet, ProtocolInfo::PROTOCOL_1_18_0));
+
+		$decoded = new SubChunkPacket();
+		$decoded->decode(new ByteBufferReader($wire), ProtocolInfo::PROTOCOL_1_18_0);
+		self::assertFalse($decoded->isCacheEnabled());
+		self::assertSame(-4, $decoded->getBaseSubChunkPosition()->getY());
+		self::assertSame(1, $decoded->getBaseSubChunkPosition()->getX());
+		self::assertSame(2, $decoded->getBaseSubChunkPosition()->getZ());
 	}
 }

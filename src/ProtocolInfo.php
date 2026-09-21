@@ -39,9 +39,6 @@ final class ProtocolInfo{
 	 * set of named protocol profiles below.
 	 */
 	public const ACCEPTED_PROTOCOL = [
-		self::PROTOCOL_1_18_0,
-		self::PROTOCOL_1_18_10,
-		self::PROTOCOL_1_18_30,
 		self::PROTOCOL_1_20_0,
 		self::PROTOCOL_1_20_10,
 		self::PROTOCOL_1_20_30,
