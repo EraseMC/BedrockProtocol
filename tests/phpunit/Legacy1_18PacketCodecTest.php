@@ -68,4 +68,17 @@ final class Legacy1_18PacketCodecTest extends TestCase{
 		$modernPacket->decode(new ByteBufferReader($modernWire), ProtocolInfo::PROTOCOL_1_19_0);
 		self::assertSame($modernWire, self::encode($modernPacket, ProtocolInfo::PROTOCOL_1_19_0));
 	}
+
+	public function testPlayerActionHasNoResultPositionBefore1_19() : void{
+		$legacyWire = hex2bin('24010002460402');
+		$packet = new PlayerActionPacket();
+		$packet->decode(new ByteBufferReader($legacyWire), ProtocolInfo::PROTOCOL_1_18_0);
+		self::assertSame($legacyWire, self::encode($packet, ProtocolInfo::PROTOCOL_1_18_0));
+		self::assertTrue($packet->blockPosition->equals($packet->resultPosition));
+
+		$modernWire = hex2bin('24010002460402460402');
+		$modernPacket = new PlayerActionPacket();
+		$modernPacket->decode(new ByteBufferReader($modernWire), ProtocolInfo::PROTOCOL_1_19_0);
+		self::assertSame($modernWire, self::encode($modernPacket, ProtocolInfo::PROTOCOL_1_19_0));
+	}
 }
