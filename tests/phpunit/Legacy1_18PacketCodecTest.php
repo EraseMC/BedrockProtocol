@@ -53,4 +53,19 @@ final class Legacy1_18PacketCodecTest extends TestCase{
 		self::assertSame(1, $decoded->getBaseSubChunkPosition()->getX());
 		self::assertSame(2, $decoded->getBaseSubChunkPosition()->getZ());
 	}
+
+	public function testPlayerAuthInputHasNoInteractionModeBefore1_19() : void{
+		// 1.18 has pitch/yaw/position/move/head (8 floats), flags/modes/tick (4 varints), then delta (3 floats).
+		$flags = str_repeat("\x80", 9) . "\x00";
+		$legacyWire = hex2bin('9001') . str_repeat("\x00", 32) . $flags . str_repeat("\x00", 3) . str_repeat("\x00", 12);
+		$packet = new PlayerAuthInputPacket();
+		$packet->decode(new ByteBufferReader($legacyWire), ProtocolInfo::PROTOCOL_1_18_0);
+		self::assertSame($legacyWire, self::encode($packet, ProtocolInfo::PROTOCOL_1_18_0));
+		self::assertSame(0, $packet->getTick());
+
+		$modernWire = hex2bin('9001') . str_repeat("\x00", 32) . $flags . str_repeat("\x00", 4) . str_repeat("\x00", 12);
+		$modernPacket = new PlayerAuthInputPacket();
+		$modernPacket->decode(new ByteBufferReader($modernWire), ProtocolInfo::PROTOCOL_1_19_0);
+		self::assertSame($modernWire, self::encode($modernPacket, ProtocolInfo::PROTOCOL_1_19_0));
+	}
 }

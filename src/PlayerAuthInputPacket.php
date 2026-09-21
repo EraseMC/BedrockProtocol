@@ -305,7 +305,7 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 		}
 		$this->inputMode = VarInt::readUnsignedInt($in);
 		$this->playMode = VarInt::readUnsignedInt($in);
-		$this->interactionMode = $protocolId >= ProtocolInfo::PROTOCOL_1_26_40 ? VarInt::readSignedInt($in) : VarInt::readUnsignedInt($in);
+		$this->interactionMode = $protocolId < ProtocolInfo::PROTOCOL_1_19_0 ? InteractionMode::CROSSHAIR : ($protocolId >= ProtocolInfo::PROTOCOL_1_26_40 ? VarInt::readSignedInt($in) : VarInt::readUnsignedInt($in));
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_21_40){
 			$this->interactRotation = CommonTypes::getVector2($in);
 		}elseif($this->playMode === PlayMode::VR){
@@ -395,10 +395,12 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 		}
 		VarInt::writeUnsignedInt($out, $this->inputMode);
 		VarInt::writeUnsignedInt($out, $this->playMode);
-		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
-			VarInt::writeSignedInt($out, $this->interactionMode);
-		}else{
-			VarInt::writeUnsignedInt($out, $this->interactionMode);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_0){
+			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+				VarInt::writeSignedInt($out, $this->interactionMode);
+			}else{
+				VarInt::writeUnsignedInt($out, $this->interactionMode);
+			}
 		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_21_40){
 			CommonTypes::putVector2($out, $this->interactRotation);
