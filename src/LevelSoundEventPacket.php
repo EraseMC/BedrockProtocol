@@ -25,6 +25,16 @@ use pocketmine\network\mcpe\protocol\types\LevelSoundEvent;
 class LevelSoundEventPacket extends DataPacket implements ClientboundPacket, ServerboundPacket{
 	public const NETWORK_ID = ProtocolInfo::LEVEL_SOUND_EVENT_PACKET;
 
+	/**
+	 * Sounds added after a legacy client shipped have no ID on it, and sending one out of its range breaks the client
+	 * (and any proxy decoding the packet). Anything above the last ID a profile knows is sent as its UNDEFINED sound.
+	 */
+	private const LEGACY_LAST_SOUND_ID = [
+		ProtocolInfo::PROTOCOL_1_18_0 => 375,
+		ProtocolInfo::PROTOCOL_1_18_10 => 375,
+		ProtocolInfo::PROTOCOL_1_18_30 => 375,
+	];
+
 	/** @see LevelSoundEvent */
 	public string $sound;
 	public Vector3 $position;
@@ -87,7 +97,9 @@ class LevelSoundEventPacket extends DataPacket implements ClientboundPacket, Ser
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_30){
 			CommonTypes::putString($out, $this->sound);
 		}else{
-			VarInt::writeUnsignedInt($out, LevelSoundEvent::toId($this->sound));
+			$id = LevelSoundEvent::toId($this->sound);
+			$lastId = self::LEGACY_LAST_SOUND_ID[$protocolId] ?? null;
+			VarInt::writeUnsignedInt($out, $lastId !== null && $id > $lastId ? $lastId : $id);
 		}
 		CommonTypes::putVector3($out, $this->position);
 		VarInt::writeSignedInt($out, $this->extraData);

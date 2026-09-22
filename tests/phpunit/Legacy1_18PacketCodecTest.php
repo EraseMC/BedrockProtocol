@@ -7,6 +7,8 @@ namespace pocketmine\network\mcpe\protocol;
 use PHPUnit\Framework\TestCase;
 use pmmp\encoding\ByteBufferReader;
 use pmmp\encoding\ByteBufferWriter;
+use pocketmine\math\Vector3;
+use pocketmine\network\mcpe\protocol\types\LevelSoundEvent;
 use pocketmine\network\mcpe\protocol\types\SubChunkPosition;
 use pocketmine\network\mcpe\protocol\types\SubChunkPositionOffset;
 use pocketmine\network\mcpe\protocol\types\SubChunkPacketEntry;
@@ -80,5 +82,17 @@ final class Legacy1_18PacketCodecTest extends TestCase{
 		$modernPacket = new PlayerActionPacket();
 		$modernPacket->decode(new ByteBufferReader($modernWire), ProtocolInfo::PROTOCOL_1_19_0);
 		self::assertSame($modernWire, self::encode($modernPacket, ProtocolInfo::PROTOCOL_1_19_0));
+	}
+
+	public function testLevelSoundEventClampsNewerSoundsIn1_18() : void{
+		// 1.18 knows sounds 0-375, so a newer one must go out as its last ID instead of an ID the client has no type for.
+		$newSound = LevelSoundEventPacket::nonActorSound(LevelSoundEvent::PRESSURE_PLATE_CLICK_ON, new Vector3(0, 0, 0), false);
+		$tail = hex2bin('00000000000000000000000001013a0000');
+
+		self::assertSame(hex2bin('7bf702') . $tail, self::encode($newSound, ProtocolInfo::PROTOCOL_1_18_10));
+		self::assertSame(hex2bin('7bc103') . $tail, self::encode($newSound, ProtocolInfo::PROTOCOL_1_20_0));
+
+		$oldSound = LevelSoundEventPacket::nonActorSound(LevelSoundEvent::HIT, new Vector3(0, 0, 0), false);
+		self::assertSame(hex2bin('7b01') . $tail, self::encode($oldSound, ProtocolInfo::PROTOCOL_1_18_10));
 	}
 }
