@@ -177,8 +177,15 @@ final class CommonTypes{
 		}
 		$capeData = self::getSkinImage($in);
 		$geometryData = self::getString($in);
-		$geometryDataVersion = self::getString($in);
+		//before 1.17.30 there is no engine version, and the premium/persona flags follow the animation data
+		$geometryDataVersion = $protocolId >= ProtocolInfo::PROTOCOL_1_17_30 ? self::getString($in) : "";
 		$animationData = self::getString($in);
+		if($protocolId < ProtocolInfo::PROTOCOL_1_17_30){
+			$premium = self::getBool($in);
+			$persona = self::getBool($in);
+			$capeOnClassic = self::getBool($in);
+			$isPrimaryUser = true;
+		}
 		$capeId = self::getString($in);
 		$fullSkinId = self::getString($in);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
@@ -240,11 +247,13 @@ final class CommonTypes{
 			}
 		}
 
-		$premium = self::getBool($in);
-		$persona = self::getBool($in);
-		$capeOnClassic = self::getBool($in);
-		$isPrimaryUser = self::getBool($in);
-		$override = $protocolId >= ProtocolInfo::PROTOCOL_1_19_63 ? self::getBool($in) : true;
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_17_30){
+			$premium = self::getBool($in);
+			$persona = self::getBool($in);
+			$capeOnClassic = self::getBool($in);
+			$isPrimaryUser = self::getBool($in);
+		}
+		$override =$protocolId >= ProtocolInfo::PROTOCOL_1_19_63 ? self::getBool($in) : true;
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			$trustedSkinFlag = self::getString($in);
 			$profileHash = self::getString($in);
@@ -302,8 +311,15 @@ final class CommonTypes{
 		}
 		self::putSkinImage($out, $skin->getCapeImage());
 		self::putString($out, $skin->getGeometryDataJson());
-		self::putString($out, $skin->getGeometryDataEngineVersion());
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_17_30){
+			self::putString($out, $skin->getGeometryDataEngineVersion());
+		}
 		self::putString($out, $skin->getAnimationData());
+		if($protocolId < ProtocolInfo::PROTOCOL_1_17_30){
+			self::putBool($out, $skin->isPremium());
+			self::putBool($out, $skin->isPersona());
+			self::putBool($out, $skin->isPersonaCapeOnClassic());
+		}
 		self::putString($out, $skin->getCapeId());
 		self::putString($out, $skin->getFullSkinId());
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
@@ -342,10 +358,12 @@ final class CommonTypes{
 				}
 			}
 		}
-		self::putBool($out, $skin->isPremium());
-		self::putBool($out, $skin->isPersona());
-		self::putBool($out, $skin->isPersonaCapeOnClassic());
-		self::putBool($out, $skin->isPrimaryUser());
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_17_30){
+			self::putBool($out, $skin->isPremium());
+			self::putBool($out, $skin->isPersona());
+			self::putBool($out, $skin->isPersonaCapeOnClassic());
+			self::putBool($out, $skin->isPrimaryUser());
+		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_63){
 			self::putBool($out, $skin->isOverride());
 		}
