@@ -34,8 +34,16 @@ final class PlayerMovementSettings{
 	public function isServerAuthoritativeBlockBreaking() : bool{ return $this->serverAuthoritativeBlockBreaking; }
 
 	public static function read(ByteBufferReader $in, int $protocolId) : self{
+		if($protocolId < ProtocolInfo::PROTOCOL_1_16_100){
+			//only a server-authoritative flag; the server always sets it, as the core has no client-authoritative movement handling
+			CommonTypes::getBool($in);
+			return new self(ServerAuthMovementMode::SERVER_AUTHORITATIVE_V2, 0, false);
+		}
 		if($protocolId <= ProtocolInfo::PROTOCOL_1_21_80){
 			$movementType = ServerAuthMovementMode::fromPacket(VarInt::readSignedInt($in));
+		}
+		if($protocolId < ProtocolInfo::PROTOCOL_1_16_210){
+			return new self($movementType ?? ServerAuthMovementMode::SERVER_AUTHORITATIVE_V2, 0, false);
 		}
 		$rewindHistorySize = VarInt::readSignedInt($in);
 		$serverAuthBlockBreaking = CommonTypes::getBool($in);
@@ -43,10 +51,17 @@ final class PlayerMovementSettings{
 	}
 
 	public function write(ByteBufferWriter $out, int $protocolId) : void{
+		if($protocolId < ProtocolInfo::PROTOCOL_1_16_100){
+			CommonTypes::putBool($out, true);
+			return;
+		}
 		if($protocolId <= ProtocolInfo::PROTOCOL_1_21_80){
 			VarInt::writeSignedInt($out, $this->movementType->value);
 		}elseif($this->movementType !== ServerAuthMovementMode::SERVER_AUTHORITATIVE_V3){
 			throw new \InvalidArgumentException("Unsupported movement type for protocol version {$protocolId}: {$this->movementType->name}");
+		}
+		if($protocolId < ProtocolInfo::PROTOCOL_1_16_210){
+			return;
 		}
 		VarInt::writeSignedInt($out, $this->rewindHistorySize);
 		CommonTypes::putBool($out, $this->serverAuthoritativeBlockBreaking);

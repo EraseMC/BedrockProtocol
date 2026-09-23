@@ -50,7 +50,7 @@ class InventoryContentPacket extends DataPacket implements ClientboundPacket{
 		$this->windowId = VarInt::readUnsignedInt($in);
 		$count = VarInt::readUnsignedInt($in);
 		for($i = 0; $i < $count; ++$i){
-			$this->items[] = CommonTypes::getItemStackWrapper($in, $protocolId, $protocolId >= ProtocolInfo::PROTOCOL_1_26_30);
+			$this->items[] = CommonTypes::getItemStackWrapper($in, $protocolId, $protocolId >= ProtocolInfo::PROTOCOL_1_26_30, true);
 		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_21_30){
 			$this->containerName = FullContainerName::read($in, $protocolId);
@@ -68,7 +68,7 @@ class InventoryContentPacket extends DataPacket implements ClientboundPacket{
 		VarInt::writeUnsignedInt($out, $this->windowId);
 		VarInt::writeUnsignedInt($out, count($this->items));
 		foreach($this->items as $item){
-			CommonTypes::putItemStackWrapper($out, $protocolId, $item, $protocolId >= ProtocolInfo::PROTOCOL_1_26_30);
+			CommonTypes::putItemStackWrapper($out, $protocolId, $item, $protocolId >= ProtocolInfo::PROTOCOL_1_26_30, true);
 		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_21_30){
 			$this->containerName->write($out, $protocolId);

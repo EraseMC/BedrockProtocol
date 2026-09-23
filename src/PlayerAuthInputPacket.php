@@ -311,8 +311,13 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 		}elseif($this->playMode === PlayMode::VR){
 			$this->vrGazeDirection = CommonTypes::getVector3($in);
 		}
-		$this->tick = VarInt::readUnsignedLong($in);
-		$this->delta = CommonTypes::getVector3($in);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_16_100){
+			$this->tick = VarInt::readUnsignedLong($in);
+			$this->delta = CommonTypes::getVector3($in);
+		}else{
+			$this->tick = 0;
+			$this->delta = Vector3::zero();
+		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50){
 				$this->itemInteractionData = CommonTypes::readOptional($in, fn(ByteBufferReader $in) => ItemInteractionData::read($in, $protocolId));
@@ -336,8 +341,8 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 			}else{
 				throw new PacketDecodeException("Vehicle rotation and actor unique ID must both be present or both be absent");
 			}
-		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_17_0){
-			// Real 1.17 clients using server-authoritative movement send these
+		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_16_210){
+			// Clients from 1.16.210 using server-authoritative movement send these
 			// flag-gated fields too. Historical servers used legacy movement and
 			// did not exercise this layout.
 			if($this->inputFlags->get(PlayerAuthInputFlags::PERFORM_ITEM_INTERACTION)){
@@ -411,8 +416,10 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 			assert($this->vrGazeDirection !== null);
 			CommonTypes::putVector3($out, $this->vrGazeDirection);
 		}
-		VarInt::writeUnsignedLong($out, $this->tick);
-		CommonTypes::putVector3($out, $this->delta);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_16_100){
+			VarInt::writeUnsignedLong($out, $this->tick);
+			CommonTypes::putVector3($out, $this->delta);
+		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50){
 				CommonTypes::writeOptional($out, $this->itemInteractionData, fn(ByteBufferWriter $out, ItemInteractionData $data) => $data->write($out, $protocolId));
@@ -427,7 +434,7 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 				CommonTypes::writeDoubleOptional($out, $this->vehicleInfo?->getVehicleRotation(), CommonTypes::putVector2(...));
 				CommonTypes::writeDoubleOptional($out, $this->vehicleInfo?->getPredictedVehicleActorUniqueId(), CommonTypes::putActorUniqueId(...));
 			}
-		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_17_0){
+		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_16_210){
 			if($this->itemInteractionData !== null){
 				$this->itemInteractionData->write($out, $protocolId);
 			}

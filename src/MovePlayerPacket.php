@@ -117,7 +117,7 @@ class MovePlayerPacket extends DataPacket implements ClientboundPacket, Serverbo
 		}else{
 			$this->telemetryData = $this->mode === self::MODE_TELEPORT ? MovePlayerTeleportData::read($in) : null;
 		}
-		$this->tick = VarInt::readUnsignedLong($in);
+		$this->tick = $protocolId >= ProtocolInfo::PROTOCOL_1_16_100 ? VarInt::readUnsignedLong($in) : 0;
 	}
 
 	protected function encodePayload(ByteBufferWriter $out, int $protocolId) : void{
@@ -134,7 +134,9 @@ class MovePlayerPacket extends DataPacket implements ClientboundPacket, Serverbo
 		}elseif($this->mode === self::MODE_TELEPORT){
 			($this->telemetryData ?? throw new \InvalidArgumentException("telemetryData must be set when mode is MODE_TELEPORT"))->write($out);
 		}
-		VarInt::writeUnsignedLong($out, $this->tick);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_16_100){
+			VarInt::writeUnsignedLong($out, $this->tick);
+		}
 	}
 
 	public function handle(PacketHandlerInterface $handler) : bool{

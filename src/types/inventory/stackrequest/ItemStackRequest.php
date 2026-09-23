@@ -97,6 +97,14 @@ final class ItemStackRequest{
 				}
 			}else{
 				$innerTypeId = Byte::readUnsigned($in);
+				// 1.16.210 inserted MINE_BLOCK at 9 and 1.16.200 inserted CRAFTING_RECIPE_OPTIONAL
+				// before the deprecated actions; normalise older IDs to 1.17 numbering first.
+				if($protocolId < ProtocolInfo::PROTOCOL_1_16_210 && $innerTypeId >= 9){
+					++$innerTypeId;
+				}
+				if($protocolId < ProtocolInfo::PROTOCOL_1_16_200 && $innerTypeId >= 13){
+					++$innerTypeId;
+				}
 				// 1.18 added grindstone and loom before the two deprecated
 				// crafting actions. 1.17 wire IDs 14/15 therefore map to
 				// modern IDs 18/19, not to grindstone/loom.
@@ -113,7 +121,7 @@ final class ItemStackRequest{
 			}
 			return self::readAction($in, $protocolId, $typeId);
 		});
-		$filterStrings = CommonTypes::readList($in, CommonTypes::getString(...));
+		$filterStrings = $protocolId >= ProtocolInfo::PROTOCOL_1_16_200 ? CommonTypes::readList($in, CommonTypes::getString(...)) : [];
 		$filterStringCause = $protocolId >= ProtocolInfo::PROTOCOL_1_19_30 ? LE::readSignedInt($in) : 0;
 		return new self($requestId, $actions, $filterStrings, $filterStringCause);
 	}
@@ -131,10 +139,21 @@ final class ItemStackRequest{
 			if($protocolId < ProtocolInfo::PROTOCOL_1_18_0 && $innerTypeId >= 16){
 				$innerTypeId -= 2;
 			}
+			if(($protocolId < ProtocolInfo::PROTOCOL_1_16_200 && $innerTypeId === 13) || ($protocolId < ProtocolInfo::PROTOCOL_1_16_210 && $innerTypeId === 9)){
+				throw new \InvalidArgumentException("Item stack request action " . $action->getTypeId() . " does not exist in protocol $protocolId");
+			}
+			if($protocolId < ProtocolInfo::PROTOCOL_1_16_200 && $innerTypeId > 13){
+				--$innerTypeId;
+			}
+			if($protocolId < ProtocolInfo::PROTOCOL_1_16_210 && $innerTypeId > 9){
+				--$innerTypeId;
+			}
 			Byte::writeUnsigned($out, $innerTypeId);
 			$action->write($out, $protocolId);
 		});
-		CommonTypes::writeList($out, $this->filterStrings, CommonTypes::putString(...));
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_16_200){
+			CommonTypes::writeList($out, $this->filterStrings, CommonTypes::putString(...));
+		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_30){
 			LE::writeSignedInt($out, $this->filterStringCause);
 		}

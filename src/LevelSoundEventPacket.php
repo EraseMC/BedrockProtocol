@@ -30,6 +30,14 @@ class LevelSoundEventPacket extends DataPacket implements ClientboundPacket, Ser
 	 * (and any proxy decoding the packet). Anything above the last ID a profile knows is sent as its UNDEFINED sound.
 	 */
 	private const LEGACY_LAST_SOUND_ID = [
+		//1.16.0 shipped the Nether Update sounds (up to 327); powder snow (328, 329) arrived with the experimental
+		//caves content. The exact 1.16.100 boundary is not documented, so it is treated like 1.16.0.
+		ProtocolInfo::PROTOCOL_1_16_0 => 328,
+		ProtocolInfo::PROTOCOL_1_16_20 => 328,
+		ProtocolInfo::PROTOCOL_1_16_100 => 328,
+		ProtocolInfo::PROTOCOL_1_16_200 => 330,
+		ProtocolInfo::PROTOCOL_1_16_210 => 330,
+		ProtocolInfo::PROTOCOL_1_16_220 => 330,
 		ProtocolInfo::PROTOCOL_1_17_0 => 330,
 		ProtocolInfo::PROTOCOL_1_17_10 => 330,
 		ProtocolInfo::PROTOCOL_1_17_30 => 330,

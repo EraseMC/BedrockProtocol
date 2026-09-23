@@ -135,6 +135,12 @@ final class ProtocolInfo{
 	public const PROTOCOL_1_17_30 = 465;
 	public const PROTOCOL_1_17_10 = 448;
 	public const PROTOCOL_1_17_0 = 440;
+	public const PROTOCOL_1_16_220 = 431;
+	public const PROTOCOL_1_16_210 = 428;
+	public const PROTOCOL_1_16_200 = 422;
+	public const PROTOCOL_1_16_100 = 419;
+	public const PROTOCOL_1_16_20 = 408;
+	public const PROTOCOL_1_16_0 = 407;
 
 	public const LOGIN_PACKET = 0x01;
 	public const PLAY_STATUS_PACKET = 0x02;
@@ -172,7 +178,7 @@ final class ProtocolInfo{
 	public const BLOCK_PICK_REQUEST_PACKET = 0x22;
 	public const ACTOR_PICK_REQUEST_PACKET = 0x23;
 	public const PLAYER_ACTION_PACKET = 0x24;
-
+	public const ACTOR_FALL_PACKET = 0x25;
 	public const HURT_ARMOR_PACKET = 0x26;
 	public const SET_ACTOR_DATA_PACKET = 0x27;
 	public const SET_ACTOR_MOTION_PACKET = 0x28;
@@ -206,7 +212,7 @@ final class ProtocolInfo{
 	public const MAP_INFO_REQUEST_PACKET = 0x44;
 	public const REQUEST_CHUNK_RADIUS_PACKET = 0x45;
 	public const CHUNK_RADIUS_UPDATED_PACKET = 0x46;
-
+	public const ITEM_FRAME_DROP_ITEM_PACKET = 0x47;
 	public const GAME_RULES_CHANGED_PACKET = 0x48;
 	public const CAMERA_PACKET = 0x49;
 	public const BOSS_EVENT_PACKET = 0x4a;
@@ -252,6 +258,7 @@ final class ProtocolInfo{
 	public const UPDATE_SOFT_ENUM_PACKET = 0x72;
 	public const NETWORK_STACK_LATENCY_PACKET = 0x73;
 
+	public const SCRIPT_CUSTOM_EVENT_PACKET = 0x75;
 	public const SPAWN_PARTICLE_EFFECT_PACKET = 0x76;
 	public const AVAILABLE_ACTOR_IDENTIFIERS_PACKET = 0x77;
 	public const LEVEL_SOUND_EVENT_PACKET_V2 = 0x78;
@@ -295,7 +302,7 @@ final class ProtocolInfo{
 	public const PLAYER_FOG_PACKET = 0xa0;
 	public const CORRECT_PLAYER_MOVE_PREDICTION_PACKET = 0xa1;
 	public const ITEM_REGISTRY_PACKET = 0xa2;
-
+	public const FILTER_TEXT_PACKET = 0xa3;
 	public const CLIENTBOUND_DEBUG_RENDERER_PACKET = 0xa4;
 	public const SYNC_ACTOR_PROPERTY_PACKET = 0xa5;
 	public const ADD_VOLUME_ENTITY_PACKET = 0xa6;

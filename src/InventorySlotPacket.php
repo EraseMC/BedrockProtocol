@@ -64,7 +64,7 @@ class InventorySlotPacket extends DataPacket implements ClientboundPacket{
 			}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_21_20){
 				$this->containerName = new FullContainerName(0, VarInt::readUnsignedInt($in));
 			}
-			$this->item = CommonTypes::getItemStackWrapper($in, $protocolId, false);
+			$this->item = CommonTypes::getItemStackWrapper($in, $protocolId, false, true);
 		}
 	}
 
@@ -90,7 +90,7 @@ class InventorySlotPacket extends DataPacket implements ClientboundPacket{
 			}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_21_20){
 				VarInt::writeUnsignedInt($out, $this->containerName->getDynamicId() ?? 0);
 			}
-			CommonTypes::putItemStackWrapper($out, $protocolId, $this->item, false);
+			CommonTypes::putItemStackWrapper($out, $protocolId, $this->item, false, true);
 		}
 	}
 

@@ -51,7 +51,7 @@ class SetActorDataPacket extends DataPacket implements ClientboundPacket, Server
 		$this->actorRuntimeId = CommonTypes::getActorRuntimeId($in);
 		$this->metadata = CommonTypes::getEntityMetadata($in, $protocolId);
 		$this->syncedProperties = $protocolId >= ProtocolInfo::PROTOCOL_1_19_40 ? PropertySyncData::read($in) : new PropertySyncData([], []);
-		$this->tick = VarInt::readUnsignedLong($in);
+		$this->tick = $protocolId >= ProtocolInfo::PROTOCOL_1_16_100 ? VarInt::readUnsignedLong($in) : 0;
 	}
 
 	protected function encodePayload(ByteBufferWriter $out, int $protocolId) : void{
@@ -60,7 +60,9 @@ class SetActorDataPacket extends DataPacket implements ClientboundPacket, Server
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_40){
 			$this->syncedProperties->write($out);
 		}
-		VarInt::writeUnsignedLong($out, $this->tick);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_16_100){
+			VarInt::writeUnsignedLong($out, $this->tick);
+		}
 	}
 
 	public function handle(PacketHandlerInterface $handler) : bool{

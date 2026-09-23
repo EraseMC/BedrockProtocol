@@ -166,6 +166,10 @@ trait PacketHandlerDefaultImplTrait{
 		return false;
 	}
 
+	public function handleActorFall(ActorFallPacket $packet) : bool{
+		return false;
+	}
+
 	public function handleHurtArmor(HurtArmorPacket $packet) : bool{
 		return false;
 	}
@@ -295,6 +299,10 @@ trait PacketHandlerDefaultImplTrait{
 	}
 
 	public function handleChunkRadiusUpdated(ChunkRadiusUpdatedPacket $packet) : bool{
+		return false;
+	}
+
+	public function handleItemFrameDropItem(ItemFrameDropItemPacket $packet) : bool{
 		return false;
 	}
 
@@ -474,6 +482,10 @@ trait PacketHandlerDefaultImplTrait{
 		return false;
 	}
 
+	public function handleScriptCustomEvent(ScriptCustomEventPacket $packet) : bool{
+		return false;
+	}
+
 	public function handleSpawnParticleEffect(SpawnParticleEffectPacket $packet) : bool{
 		return false;
 	}
@@ -635,6 +647,10 @@ trait PacketHandlerDefaultImplTrait{
 	}
 
 	public function handleItemRegistry(ItemRegistryPacket $packet) : bool{
+		return false;
+	}
+
+	public function handleFilterText(FilterTextPacket $packet) : bool{
 		return false;
 	}
 

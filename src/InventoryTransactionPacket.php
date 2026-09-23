@@ -43,6 +43,8 @@ class InventoryTransactionPacket extends DataPacket implements ClientboundPacket
 	/** @var InventoryTransactionChangedSlotsHack[] */
 	public ?array $requestChangedSlots = null;
 	public TransactionData $trData;
+	/** Before 1.16.220 the client may attach the new stack ID to each action; see NetworkInventoryAction. */
+	public bool $legacyHasItemStackIds = false;
 
 	/**
 	 * @generate-create-func
@@ -77,6 +79,9 @@ class InventoryTransactionPacket extends DataPacket implements ClientboundPacket
 			CommonTypes::readDummyOptional($in);
 		}
 		$transactionType = VarInt::readUnsignedInt($in);
+		if($protocolId < ProtocolInfo::PROTOCOL_1_16_220){
+			$this->legacyHasItemStackIds = CommonTypes::getBool($in);
+		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_30 && $protocolId < ProtocolInfo::PROTOCOL_1_26_50){
 			CommonTypes::readDummyOptional($in);
 		}
@@ -88,7 +93,7 @@ class InventoryTransactionPacket extends DataPacket implements ClientboundPacket
 			ReleaseItemTransactionData::ID => new ReleaseItemTransactionData(),
 			default => throw new PacketDecodeException("Unknown transaction type $transactionType"),
 		};
-		$this->trData->decodeTransaction($in, $protocolId);
+		$this->trData->decodeTransaction($in, $protocolId, $this->legacyHasItemStackIds);
 	}
 
 	protected function encodePayload(ByteBufferWriter $out, int $protocolId) : void{
@@ -112,11 +117,14 @@ class InventoryTransactionPacket extends DataPacket implements ClientboundPacket
 			}
 		}
 		VarInt::writeUnsignedInt($out, $this->trData->getTypeId());
+		if($protocolId < ProtocolInfo::PROTOCOL_1_16_220){
+			CommonTypes::putBool($out, $this->legacyHasItemStackIds);
+		}
 
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_30 && $protocolId < ProtocolInfo::PROTOCOL_1_26_50){
 			CommonTypes::writeDummyOptional($out);
 		}
-		$this->trData->encodeTransaction($out, $protocolId);
+		$this->trData->encodeTransaction($out, $protocolId, $this->legacyHasItemStackIds);
 	}
 
 	public function handle(PacketHandlerInterface $handler) : bool{

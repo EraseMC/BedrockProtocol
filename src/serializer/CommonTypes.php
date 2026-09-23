@@ -47,6 +47,8 @@ use pocketmine\network\mcpe\protocol\types\FloatGameRule;
 use pocketmine\network\mcpe\protocol\types\GameRule;
 use pocketmine\network\mcpe\protocol\types\IntGameRule;
 use pocketmine\network\mcpe\protocol\types\inventory\ItemStack;
+use pocketmine\network\mcpe\protocol\types\inventory\ItemStackExtraData;
+use pocketmine\network\mcpe\protocol\types\inventory\ItemStackExtraDataShield;
 use pocketmine\network\mcpe\protocol\types\inventory\ItemStackWrapper;
 use pocketmine\network\mcpe\protocol\types\NullGameRule;
 use pocketmine\network\mcpe\protocol\types\recipe\ComplexAliasItemDescriptor;
@@ -153,7 +155,7 @@ final class CommonTypes{
 	/** @throws DataDecodeException */
 	public static function getSkin(ByteBufferReader $in, int $protocolId) : SkinData{
 		$skinId = self::getString($in);
-		$skinPlayFabId = self::getString($in);
+		$skinPlayFabId = $protocolId >= ProtocolInfo::PROTOCOL_1_16_210 ? self::getString($in) : "";
 		$skinResourcePatch = self::getString($in);
 		$skinData = self::getSkinImage($in);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
@@ -171,7 +173,7 @@ final class CommonTypes{
 				$skinImage = self::getSkinImage($in);
 				$animationType = LE::readUnsignedInt($in);
 				$animationFrames = LE::readFloat($in);
-				$expressionType = LE::readUnsignedInt($in);
+				$expressionType = $protocolId >= ProtocolInfo::PROTOCOL_1_16_100 ? LE::readUnsignedInt($in) : 0;
 				$animations[] = new SkinAnimation($skinImage, $animationType, $animationFrames, $expressionType);
 			}
 		}
@@ -290,7 +292,9 @@ final class CommonTypes{
 
 	public static function putSkin(ByteBufferWriter $out, int $protocolId, SkinData $skin) : void{
 		self::putString($out, $skin->getSkinId());
-		self::putString($out, $skin->getPlayFabId());
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_16_210){
+			self::putString($out, $skin->getPlayFabId());
+		}
 		self::putString($out, $skin->getResourcePatch());
 		self::putSkinImage($out, $skin->getSkinImage());
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
@@ -306,7 +310,9 @@ final class CommonTypes{
 				self::putSkinImage($out, $animation->getImage());
 				LE::writeUnsignedInt($out, $animation->getType());
 				LE::writeFloat($out, $animation->getFrames());
-				LE::writeUnsignedInt($out, $animation->getExpressionType());
+				if($protocolId >= ProtocolInfo::PROTOCOL_1_16_100){
+					LE::writeUnsignedInt($out, $animation->getExpressionType());
+				}
 			}
 		}
 		self::putSkinImage($out, $skin->getCapeImage());
@@ -435,11 +441,104 @@ final class CommonTypes{
 	}
 
 	/**
+	 * Runtime ID of minecraft:shield in the item tables used by the pre-1.16.220 profiles (required_item_list-1.16.0
+	 * for 407/408, required_item_list-1.16.100 for 419-428). Legacy shields carry a blocking tick after the lists, so
+	 * the codec must know the ID to find the end of the stack.
+	 */
+	private static function getLegacyShieldRuntimeId(int $protocolId) : int{
+		return $protocolId >= ProtocolInfo::PROTOCOL_1_16_100 ? 355 : 513;
+	}
+
+	/**
+	 * Before 1.16.220, item stacks carried count and meta in one varint and embedded their extra data inline, with
+	 * network (varint) NBT and varint-prefixed lists. The stack is converted to and from the modern extra data blob so
+	 * that consumers see the same representation for every protocol.
+	 *
+	 * @throws PacketDecodeException
+	 * @throws DataDecodeException
+	 */
+	private static function getLegacyItemStack(ByteBufferReader $in, int $protocolId) : ItemStack{
+		$id = VarInt::readSignedInt($in);
+		if($id === 0){
+			return ItemStack::null();
+		}
+		$auxValue = VarInt::readSignedInt($in);
+		$count = $auxValue & 0xff;
+		$meta = $auxValue >> 8;
+
+		$nbtLen = LE::readUnsignedShort($in);
+		$nbt = null;
+		if($nbtLen === 0xffff){
+			$nbtDataVersion = Byte::readUnsigned($in);
+			if($nbtDataVersion !== 1){
+				throw new PacketDecodeException("Unexpected NBT data version $nbtDataVersion");
+			}
+			$nbt = self::getNbtCompoundRoot($in);
+		}elseif($nbtLen !== 0){
+			throw new PacketDecodeException("Unexpected fake NBT length $nbtLen");
+		}
+		$canPlaceOn = [];
+		for($i = 0, $canPlaceOnCount = VarInt::readSignedInt($in); $i < $canPlaceOnCount; ++$i){
+			$canPlaceOn[] = self::getString($in);
+		}
+		$canDestroy = [];
+		for($i = 0, $canDestroyCount = VarInt::readSignedInt($in); $i < $canDestroyCount; ++$i){
+			$canDestroy[] = self::getString($in);
+		}
+
+		$extraData = new ByteBufferWriter();
+		if($id === self::getLegacyShieldRuntimeId($protocolId)){
+			(new ItemStackExtraDataShield($nbt, $canPlaceOn, $canDestroy, VarInt::readSignedLong($in)))->write($extraData);
+		}else{
+			(new ItemStackExtraData($nbt, $canPlaceOn, $canDestroy))->write($extraData);
+		}
+
+		return new ItemStack($id, $meta, $count, 0, $extraData->getData());
+	}
+
+	private static function putLegacyItemStack(ByteBufferWriter $out, int $protocolId, ItemStack $itemStack) : void{
+		$id = $itemStack->getId();
+		VarInt::writeSignedInt($out, $id);
+		if($id === 0){
+			return;
+		}
+		VarInt::writeSignedInt($out, (($itemStack->getMeta() & 0x7fff) << 8) | $itemStack->getCount());
+
+		$isShield = $id === self::getLegacyShieldRuntimeId($protocolId);
+		$rawExtraData = new ByteBufferReader($itemStack->getRawExtraData());
+		$extraData = ItemStackExtraData::read($rawExtraData);
+		$blockingTick = $isShield && $rawExtraData->getUnreadLength() >= 8 ? LE::readSignedLong($rawExtraData) : 0;
+
+		$nbt = $extraData->getNbt();
+		if($nbt !== null){
+			LE::writeUnsignedShort($out, 0xffff);
+			Byte::writeUnsigned($out, 1);
+			$out->writeByteArray((new NetworkNbtSerializer())->write(new TreeRoot($nbt)));
+		}else{
+			LE::writeUnsignedShort($out, 0);
+		}
+		VarInt::writeSignedInt($out, count($extraData->getCanPlaceOn()));
+		foreach($extraData->getCanPlaceOn() as $entry){
+			self::putString($out, $entry);
+		}
+		VarInt::writeSignedInt($out, count($extraData->getCanDestroy()));
+		foreach($extraData->getCanDestroy() as $entry){
+			self::putString($out, $entry);
+		}
+		if($isShield){
+			VarInt::writeSignedLong($out, $blockingTick);
+		}
+	}
+
+	/**
 	 * Spec name:
 	 * @throws PacketDecodeException
 	 * @throws DataDecodeException
 	 */
 	public static function getItemStackWithoutStackId(ByteBufferReader $in, int $protocolId) : ItemStack{
+		if($protocolId < ProtocolInfo::PROTOCOL_1_16_220){
+			return self::getLegacyItemStack($in, $protocolId);
+		}
 		[$id, $count, $meta] = self::getItemStackHeader($in, $protocolId);
 
 		return ($id !== 0 || $protocolId >= ProtocolInfo::PROTOCOL_1_26_40) ?
@@ -448,6 +547,10 @@ final class CommonTypes{
 	}
 
 	public static function putItemStackWithoutStackId(ByteBufferWriter $out, int $protocolId, ItemStack $itemStack) : void{
+		if($protocolId < ProtocolInfo::PROTOCOL_1_16_220){
+			self::putLegacyItemStack($out, $protocolId, $itemStack);
+			return;
+		}
 		if(self::putItemStackHeader($out, $protocolId, $itemStack)){
 			self::putItemStackFooter($out, $itemStack);
 		}
@@ -456,7 +559,12 @@ final class CommonTypes{
 	/**
 	 * @throws DataDecodeException
 	 */
-	public static function getItemStackWrapper(ByteBufferReader $in, int $protocolId, bool $networkDescriptor) : ItemStackWrapper{
+	public static function getItemStackWrapper(ByteBufferReader $in, int $protocolId, bool $networkDescriptor, bool $legacyStackIdPrefix = false) : ItemStackWrapper{
+		if($protocolId < ProtocolInfo::PROTOCOL_1_16_220){
+			//only packets which already used stack wrappers before 1.16.220 carry a (leading) stack ID
+			$stackId = $legacyStackIdPrefix ? self::readServerItemStackId($in) : 0;
+			return new ItemStackWrapper($stackId, self::getLegacyItemStack($in, $protocolId));
+		}
 		if(!$networkDescriptor){
 			[$id, $count, $meta] = self::getItemStackHeader($in, $protocolId);
 			if($id === 0 && $protocolId < ProtocolInfo::PROTOCOL_1_26_40){
@@ -488,7 +596,14 @@ final class CommonTypes{
 		return new ItemStackWrapper($stackId, new ItemStack($id, $meta, $count, $blockRuntimeId, $rawExtraData), $variant);
 	}
 
-	public static function putItemStackWrapper(ByteBufferWriter $out, int $protocolId, ItemStackWrapper $itemStackWrapper, bool $networkDescriptor) : void{
+	public static function putItemStackWrapper(ByteBufferWriter $out, int $protocolId, ItemStackWrapper $itemStackWrapper, bool $networkDescriptor, bool $legacyStackIdPrefix = false) : void{
+		if($protocolId < ProtocolInfo::PROTOCOL_1_16_220){
+			if($legacyStackIdPrefix){
+				self::writeServerItemStackId($out, $itemStackWrapper->getStackId());
+			}
+			self::putLegacyItemStack($out, $protocolId, $itemStackWrapper->getItemStack());
+			return;
+		}
 		if(!$networkDescriptor){
 			$itemStack = $itemStackWrapper->getItemStack();
 			if(self::putItemStackHeader($out, $protocolId, $itemStack)){
@@ -711,6 +826,9 @@ final class CommonTypes{
 				}
 			}
 
+			if($protocolId < ProtocolInfo::PROTOCOL_1_16_210 && $key >= self::METADATA_RIDER_ROTATION_OFFSET){
+				++$key;
+			}
 			$data[$key] = self::readMetadataProperty($in, $type);
 		}
 
@@ -733,6 +851,30 @@ final class CommonTypes{
 		};
 	}
 
+	private const METADATA_RIDER_ROTATION_OFFSET = 60;
+	private const METADATA_LAST_KEY_PRE_1_16_210 = 110; //AMBIENT_SOUND_EVENT in current numbering
+
+	/**
+	 * 1.16.210 inserted RIDER_ROTATION_OFFSET (60), shifting every later property up by one. Properties that did not
+	 * exist yet are dropped rather than sent under a colliding key.
+	 *
+	 * @param MetadataProperty[] $metadata
+	 * @phpstan-param array<int, MetadataProperty> $metadata
+	 * @return MetadataProperty[]
+	 * @phpstan-return array<int, MetadataProperty>
+	 */
+	private static function downgradeMetadataKeysPre1_16_210(array $metadata) : array{
+		$result = [];
+		foreach($metadata as $key => $property){
+			if($key < self::METADATA_RIDER_ROTATION_OFFSET){
+				$result[$key] = $property;
+			}elseif($key > self::METADATA_RIDER_ROTATION_OFFSET && $key <= self::METADATA_LAST_KEY_PRE_1_16_210){
+				$result[$key - 1] = $property;
+			}
+		}
+		return $result;
+	}
+
 	/**
 	 * Writes entity metadata to the packet buffer.
 	 *
@@ -742,6 +884,9 @@ final class CommonTypes{
 	 */
 	public static function putEntityMetadata(ByteBufferWriter $out, int $protocolId, array $metadata) : void{
 		$metadata = EntityMetadataFlags::encode($metadata, $protocolId);
+		if($protocolId < ProtocolInfo::PROTOCOL_1_16_210){
+			$metadata = self::downgradeMetadataKeysPre1_16_210($metadata);
+		}
 		VarInt::writeUnsignedInt($out, count($metadata));
 		foreach($metadata as $key => $d){
 			VarInt::writeUnsignedInt($out, $key);
@@ -891,7 +1036,7 @@ final class CommonTypes{
 			if(isset($rules[$name])){
 				throw new PacketDecodeException("Duplicate gamerule $name");
 			}
-			$isPlayerModifiable = self::getBool($in);
+			$isPlayerModifiable = $protocolId >= ProtocolInfo::PROTOCOL_1_17_0 && self::getBool($in);
 			$type = VarInt::readUnsignedInt($in);
 			$rules[$name] = self::readGameRule($in, $protocolId, $type, $isPlayerModifiable, $isStartGame);
 		}
@@ -909,7 +1054,9 @@ final class CommonTypes{
 		VarInt::writeUnsignedInt($out, count($rules));
 		foreach($rules as $name => $rule){
 			self::putString($out, $name);
-			self::putBool($out, $rule->isPlayerModifiable());
+			if($protocolId >= ProtocolInfo::PROTOCOL_1_17_0){
+				self::putBool($out, $rule->isPlayerModifiable());
+			}
 			VarInt::writeUnsignedInt($out, $rule->getTypeId());
 			$rule->encode($out, $protocolId, $isStartGame);
 		}

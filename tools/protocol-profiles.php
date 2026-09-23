@@ -24,6 +24,12 @@ declare(strict_types=1);
  * @return array<string, array{protocolId: int, accepted: bool}>
  */
 return [
+	'PROTOCOL_1_16_0' => ['protocolId' => 407, 'accepted' => false],
+	'PROTOCOL_1_16_20' => ['protocolId' => 408, 'accepted' => false],
+	'PROTOCOL_1_16_100' => ['protocolId' => 419, 'accepted' => false],
+	'PROTOCOL_1_16_200' => ['protocolId' => 422, 'accepted' => false],
+	'PROTOCOL_1_16_210' => ['protocolId' => 428, 'accepted' => false],
+	'PROTOCOL_1_16_220' => ['protocolId' => 431, 'accepted' => false],
 	'PROTOCOL_1_17_0' => ['protocolId' => 440, 'accepted' => true],
 	'PROTOCOL_1_17_10' => ['protocolId' => 448, 'accepted' => true],
 	'PROTOCOL_1_17_30' => ['protocolId' => 465, 'accepted' => true],

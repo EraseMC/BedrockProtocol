@@ -34,6 +34,6 @@ final class ClientDataAnimationFrame{
 	/** @required */
 	public string $Image;
 
-	/** @required */
-	public int $AnimationExpression;
+	/** Introduced in 1.16.100; absent from earlier client data. */
+	public int $AnimationExpression = 0;
 }

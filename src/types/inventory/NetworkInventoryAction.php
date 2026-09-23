@@ -67,6 +67,8 @@ class NetworkInventoryAction{
 	public int $inventorySlot;
 	public ItemStackWrapper $oldItem;
 	public ItemStackWrapper $newItem;
+	/** Stack ID of newItem, only present before 1.16.220 when the transaction set hasItemStackIds. */
+	public ?int $legacyNewItemStackId = null;
 
 	/**
 	 * @return $this
@@ -74,7 +76,7 @@ class NetworkInventoryAction{
 	 * @throws DataDecodeException
 	 * @throws PacketDecodeException
 	 */
-	public function readAuthInput(ByteBufferReader $in, int $protocolId) : NetworkInventoryAction{
+	public function readAuthInput(ByteBufferReader $in, int $protocolId, bool $legacyHasItemStackIds = false) : NetworkInventoryAction{
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			return $this->readTransaction($in, $protocolId);
 		}
@@ -100,6 +102,9 @@ class NetworkInventoryAction{
 		$this->inventorySlot = VarInt::readUnsignedInt($in);
 		$this->oldItem = CommonTypes::getItemStackWrapper($in, $protocolId, false);
 		$this->newItem = CommonTypes::getItemStackWrapper($in, $protocolId, false);
+		if($legacyHasItemStackIds && $protocolId < ProtocolInfo::PROTOCOL_1_16_220){
+			$this->legacyNewItemStackId = CommonTypes::readServerItemStackId($in);
+		}
 
 		return $this;
 	}
@@ -107,7 +112,7 @@ class NetworkInventoryAction{
 	/**
 	 * @throws \InvalidArgumentException
 	 */
-	public function writeAuthInput(ByteBufferWriter $out, int $protocolId) : void{
+	public function writeAuthInput(ByteBufferWriter $out, int $protocolId, bool $legacyHasItemStackIds = false) : void{
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			$this->writeTransaction($out, $protocolId);
 			return;
@@ -143,6 +148,9 @@ class NetworkInventoryAction{
 		VarInt::writeUnsignedInt($out, $this->inventorySlot);
 		CommonTypes::putItemStackWrapper($out, $protocolId, $this->oldItem, false);
 		CommonTypes::putItemStackWrapper($out, $protocolId, $this->newItem, false);
+		if($legacyHasItemStackIds && $protocolId < ProtocolInfo::PROTOCOL_1_16_220){
+			CommonTypes::writeServerItemStackId($out, $this->legacyNewItemStackId ?? 0);
+		}
 	}
 
 	/**
@@ -151,9 +159,9 @@ class NetworkInventoryAction{
 	 * @throws DataDecodeException
 	 * @throws PacketDecodeException
 	 */
-	public function readTransaction(ByteBufferReader $in, int $protocolId) : NetworkInventoryAction{
+	public function readTransaction(ByteBufferReader $in, int $protocolId, bool $legacyHasItemStackIds = false) : NetworkInventoryAction{
 		if($protocolId <= ProtocolInfo::PROTOCOL_1_26_20){
-			return $this->readAuthInput($in, $protocolId);
+			return $this->readAuthInput($in, $protocolId, $legacyHasItemStackIds);
 		}
 
 		$this->sourceType = VarInt::readUnsignedInt($in);
@@ -176,9 +184,9 @@ class NetworkInventoryAction{
 	/**
 	 * @throws \InvalidArgumentException
 	 */
-	public function writeTransaction(ByteBufferWriter $out, int $protocolId) : void{
+	public function writeTransaction(ByteBufferWriter $out, int $protocolId, bool $legacyHasItemStackIds = false) : void{
 		if($protocolId <= ProtocolInfo::PROTOCOL_1_26_20){
-			$this->writeAuthInput($out, $protocolId);
+			$this->writeAuthInput($out, $protocolId, $legacyHasItemStackIds);
 			return;
 		}
 

@@ -43,8 +43,8 @@ abstract class TransactionData{
 	 * @throws DataDecodeException
 	 * @throws PacketDecodeException
 	 */
-	final public function decodeTransaction(ByteBufferReader $in, int $protocolId) : void{
-		$this->actions = CommonTypes::readList($in, static fn($in) => (new NetworkInventoryAction())->readTransaction($in, $protocolId));
+	final public function decodeTransaction(ByteBufferReader $in, int $protocolId, bool $legacyHasItemStackIds = false) : void{
+		$this->actions = CommonTypes::readList($in, static fn($in) => (new NetworkInventoryAction())->readTransaction($in, $protocolId, $legacyHasItemStackIds));
 		$this->decodeData($in, $protocolId);
 	}
 
@@ -66,8 +66,8 @@ abstract class TransactionData{
 	 */
 	abstract protected function decodeData(ByteBufferReader $in, int $protocolId) : void;
 
-	final public function encodeTransaction(ByteBufferWriter $out, int $protocolId) : void{
-		CommonTypes::writeList($out, $this->actions, static fn($out, $a) => $a->writeTransaction($out, $protocolId));
+	final public function encodeTransaction(ByteBufferWriter $out, int $protocolId, bool $legacyHasItemStackIds = false) : void{
+		CommonTypes::writeList($out, $this->actions, static fn($out, $a) => $a->writeTransaction($out, $protocolId, $legacyHasItemStackIds));
 		$this->encodeData($out, $protocolId);
 	}
 

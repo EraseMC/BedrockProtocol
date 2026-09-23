@@ -20,5 +20,9 @@ declare(strict_types=1);
  * @return array<class-string, int>
  */
 return [
+	'ActorFallPacket' => 0x25, //1.16.0-1.16.20
 	'AdventureSettingsPacket' => 0x37,
+	'ItemFrameDropItemPacket' => 0x47,
+	'ScriptCustomEventPacket' => 0x75,
+	'FilterTextPacket' => 0xa3, //1.16.200-1.17
 ];

@@ -71,6 +71,7 @@ class PacketPool{
 		$this->registerPacket(new BlockPickRequestPacket());
 		$this->registerPacket(new ActorPickRequestPacket());
 		$this->registerPacket(new PlayerActionPacket());
+		$this->registerPacket(new ActorFallPacket());
 		$this->registerPacket(new HurtArmorPacket());
 		$this->registerPacket(new SetActorDataPacket());
 		$this->registerPacket(new SetActorMotionPacket());
@@ -104,6 +105,7 @@ class PacketPool{
 		$this->registerPacket(new MapInfoRequestPacket());
 		$this->registerPacket(new RequestChunkRadiusPacket());
 		$this->registerPacket(new ChunkRadiusUpdatedPacket());
+		$this->registerPacket(new ItemFrameDropItemPacket());
 		$this->registerPacket(new GameRulesChangedPacket());
 		$this->registerPacket(new CameraPacket());
 		$this->registerPacket(new BossEventPacket());
@@ -148,6 +150,7 @@ class PacketPool{
 		$this->registerPacket(new SetLocalPlayerAsInitializedPacket());
 		$this->registerPacket(new UpdateSoftEnumPacket());
 		$this->registerPacket(new NetworkStackLatencyPacket());
+		$this->registerPacket(new ScriptCustomEventPacket());
 		$this->registerPacket(new SpawnParticleEffectPacket());
 		$this->registerPacket(new AvailableActorIdentifiersPacket());
 		$this->registerPacket(new LevelSoundEventPacketV2());
@@ -189,6 +192,7 @@ class PacketPool{
 		$this->registerPacket(new PlayerFogPacket());
 		$this->registerPacket(new CorrectPlayerMovePredictionPacket());
 		$this->registerPacket(new ItemRegistryPacket());
+		$this->registerPacket(new FilterTextPacket());
 		$this->registerPacket(new ClientboundDebugRendererPacket());
 		$this->registerPacket(new SyncActorPropertyPacket());
 		$this->registerPacket(new AddVolumeEntityPacket());

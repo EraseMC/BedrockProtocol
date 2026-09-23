@@ -31,6 +31,7 @@ use pocketmine\network\mcpe\protocol\types\ServerJoinInformation;
 use pocketmine\network\mcpe\protocol\types\ServerTelemetryData;
 use Ramsey\Uuid\UuidInterface;
 use function count;
+use function substr;
 
 class StartGamePacket extends DataPacket implements ClientboundPacket{
 	public const NETWORK_ID = ProtocolInfo::START_GAME_PACKET;
@@ -73,6 +74,11 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 	 * @phpstan-var list<BlockPaletteEntry>
 	 */
 	public array $blockPalette = [];
+	/**
+	 * Before 1.16.100 the server defines the whole block palette: a network-NBT list of {block, id} compounds whose
+	 * order is the runtime ID. Supplied pre-encoded because the palette is a fixed data file.
+	 */
+	public string $legacyBlockPaletteNbt = "";
 
 	/**
 	 * Checksum of the full block palette. This is a hash of some weird stringified version of the NBT.
@@ -182,10 +188,16 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 		$this->enchantmentSeed = VarInt::readSignedInt($in);
 
 		$this->blockPalette = [];
-		for($i = 0, $len = VarInt::readUnsignedInt($in); $i < $len; ++$i){
-			$blockName = CommonTypes::getString($in);
-			$state = CommonTypes::getNbtCompoundRoot($in);
-			$this->blockPalette[] = new BlockPaletteEntry($blockName, new CacheableNbt($state));
+		if($protocolId < ProtocolInfo::PROTOCOL_1_16_100){
+			$start = $in->getOffset();
+			CommonTypes::getNbtRoot($in);
+			$this->legacyBlockPaletteNbt = substr($in->getData(), $start, $in->getOffset() - $start);
+		}else{
+			for($i = 0, $len = VarInt::readUnsignedInt($in); $i < $len; ++$i){
+				$blockName = CommonTypes::getString($in);
+				$state = CommonTypes::getNbtCompoundRoot($in);
+				$this->blockPalette[] = new BlockPaletteEntry($blockName, new CacheableNbt($state));
+			}
 		}
 
 		if($protocolId <= ProtocolInfo::PROTOCOL_1_21_50){
@@ -193,7 +205,7 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 			for($i = 0, $count = VarInt::readUnsignedInt($in); $i < $count; ++$i){
 				$stringId = CommonTypes::getString($in);
 				$numericId = LE::readSignedShort($in);
-				$isComponentBased = CommonTypes::getBool($in);
+				$isComponentBased = $protocolId >= ProtocolInfo::PROTOCOL_1_16_100 && CommonTypes::getBool($in);
 
 				$this->itemTable[] = new ItemTypeEntry($stringId, $numericId, $isComponentBased, -1, new CacheableNbt(new CompoundTag()));
 			}
@@ -201,7 +213,7 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 
 		$this->multiplayerCorrelationId = CommonTypes::getString($in);
 		$this->enableNewInventorySystem = CommonTypes::getBool($in);
-		$this->serverSoftwareVersion = CommonTypes::getString($in);
+		$this->serverSoftwareVersion = $protocolId >= ProtocolInfo::PROTOCOL_1_17_0 ? CommonTypes::getString($in) : "";
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_0){
 			$this->playerActorProperties = new CacheableNbt(CommonTypes::getNbtCompoundRoot($in));
 			$this->blockPaletteChecksum = LE::readUnsignedLong($in);
@@ -251,10 +263,17 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 
 		VarInt::writeSignedInt($out, $this->enchantmentSeed);
 
-		VarInt::writeUnsignedInt($out, count($this->blockPalette));
-		foreach($this->blockPalette as $entry){
-			CommonTypes::putString($out, $entry->getName());
-			$out->writeByteArray($entry->getStates()->getEncodedNbt());
+		if($protocolId < ProtocolInfo::PROTOCOL_1_16_100){
+			if($this->legacyBlockPaletteNbt === ""){
+				throw new \InvalidArgumentException("Protocol $protocolId requires the legacy block palette");
+			}
+			$out->writeByteArray($this->legacyBlockPaletteNbt);
+		}else{
+			VarInt::writeUnsignedInt($out, count($this->blockPalette));
+			foreach($this->blockPalette as $entry){
+				CommonTypes::putString($out, $entry->getName());
+				$out->writeByteArray($entry->getStates()->getEncodedNbt());
+			}
 		}
 
 		if($protocolId <= ProtocolInfo::PROTOCOL_1_21_50){
@@ -262,13 +281,17 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 			foreach($this->itemTable as $entry){
 				CommonTypes::putString($out, $entry->getStringId());
 				LE::writeSignedShort($out, $entry->getNumericId());
-				CommonTypes::putBool($out, $entry->isComponentBased());
+				if($protocolId >= ProtocolInfo::PROTOCOL_1_16_100){
+					CommonTypes::putBool($out, $entry->isComponentBased());
+				}
 			}
 		}
 
 		CommonTypes::putString($out, $this->multiplayerCorrelationId);
 		CommonTypes::putBool($out, $this->enableNewInventorySystem);
-		CommonTypes::putString($out, $this->serverSoftwareVersion);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_17_0){
+			CommonTypes::putString($out, $this->serverSoftwareVersion);
+		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_0){
 			$out->writeByteArray($this->playerActorProperties->getEncodedNbt());
 			LE::writeUnsignedLong($out, $this->blockPaletteChecksum);

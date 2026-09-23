@@ -56,6 +56,10 @@ final class ItemStackResponse{
 
 	public static function read(ByteBufferReader $in, int $protocolId) : self{
 		$result = Byte::readUnsigned($in);
+		if($protocolId < ProtocolInfo::PROTOCOL_1_16_100){
+			//a success flag, not a result code
+			$result = $result !== 0 ? self::RESULT_OK : self::RESULT_ERROR;
+		}
 		$requestId = CommonTypes::readItemStackRequestId($in);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50){
 			$containerInfos = CommonTypes::readOptional($in, fn(ByteBufferReader $in) => CommonTypes::readList($in, fn(ByteBufferReader $in) => ItemStackResponseContainerInfo::read($in, $protocolId)));
@@ -70,7 +74,11 @@ final class ItemStackResponse{
 	}
 
 	public function write(ByteBufferWriter $out, int $protocolId) : void{
-		Byte::writeUnsigned($out, $this->result);
+		if($protocolId < ProtocolInfo::PROTOCOL_1_16_100){
+			CommonTypes::putBool($out, $this->result === self::RESULT_OK);
+		}else{
+			Byte::writeUnsigned($out, $this->result);
+		}
 		CommonTypes::writeItemStackRequestId($out, $this->requestId);
 		$writeContainerInfo = fn(ByteBufferWriter $out, ItemStackResponseContainerInfo $v) => $v->write($out, $protocolId);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50){

@@ -131,7 +131,7 @@ final class LevelSettings{
 		$this->commandsEnabled = CommonTypes::getBool($in);
 		$this->isTexturePacksRequired = CommonTypes::getBool($in);
 		$this->gameRules = CommonTypes::getGameRules($in, $protocolId, true);
-		$this->experiments = Experiments::read($in);
+		$this->experiments = $protocolId >= ProtocolInfo::PROTOCOL_1_16_100 ? Experiments::read($in) : new Experiments([], false);
 		$this->hasBonusChestEnabled = CommonTypes::getBool($in);
 		$this->hasStartWithMapEnabled = CommonTypes::getBool($in);
 		$this->defaultPlayerPermission = VarInt::readSignedInt($in);
@@ -217,7 +217,9 @@ final class LevelSettings{
 		CommonTypes::putBool($out, $this->commandsEnabled);
 		CommonTypes::putBool($out, $this->isTexturePacksRequired);
 		CommonTypes::putGameRules($out, $protocolId, $this->gameRules, true);
-		$this->experiments->write($out);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_16_100){
+			$this->experiments->write($out);
+		}
 		CommonTypes::putBool($out, $this->hasBonusChestEnabled);
 		CommonTypes::putBool($out, $this->hasStartWithMapEnabled);
 		VarInt::writeSignedInt($out, $this->defaultPlayerPermission);

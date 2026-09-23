@@ -90,6 +90,8 @@ interface PacketHandlerInterface{
 
 	public function handlePlayerAction(PlayerActionPacket $packet) : bool;
 
+	public function handleActorFall(ActorFallPacket $packet) : bool;
+
 	public function handleHurtArmor(HurtArmorPacket $packet) : bool;
 
 	public function handleSetActorData(SetActorDataPacket $packet) : bool;
@@ -155,6 +157,8 @@ interface PacketHandlerInterface{
 	public function handleRequestChunkRadius(RequestChunkRadiusPacket $packet) : bool;
 
 	public function handleChunkRadiusUpdated(ChunkRadiusUpdatedPacket $packet) : bool;
+
+	public function handleItemFrameDropItem(ItemFrameDropItemPacket $packet) : bool;
 
 	public function handleGameRulesChanged(GameRulesChangedPacket $packet) : bool;
 
@@ -244,6 +248,8 @@ interface PacketHandlerInterface{
 
 	public function handleNetworkStackLatency(NetworkStackLatencyPacket $packet) : bool;
 
+	public function handleScriptCustomEvent(ScriptCustomEventPacket $packet) : bool;
+
 	public function handleSpawnParticleEffect(SpawnParticleEffectPacket $packet) : bool;
 
 	public function handleAvailableActorIdentifiers(AvailableActorIdentifiersPacket $packet) : bool;
@@ -325,6 +331,8 @@ interface PacketHandlerInterface{
 	public function handleCorrectPlayerMovePrediction(CorrectPlayerMovePredictionPacket $packet) : bool;
 
 	public function handleItemRegistry(ItemRegistryPacket $packet) : bool;
+
+	public function handleFilterText(FilterTextPacket $packet) : bool;
 
 	public function handleClientboundDebugRenderer(ClientboundDebugRendererPacket $packet) : bool;
 

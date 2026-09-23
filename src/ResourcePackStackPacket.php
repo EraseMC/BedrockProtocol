@@ -65,7 +65,11 @@ class ResourcePackStackPacket extends DataPacket implements ClientboundPacket{
 		}
 
 		$this->baseGameVersion = CommonTypes::getString($in);
-		$this->experiments = Experiments::read($in);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_16_100){
+			$this->experiments = Experiments::read($in);
+		}else{
+			$this->experiments = new Experiments([], CommonTypes::getBool($in));
+		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_20_80){
 			$this->useVanillaEditorPacks = CommonTypes::getBool($in);
 		}
@@ -86,7 +90,11 @@ class ResourcePackStackPacket extends DataPacket implements ClientboundPacket{
 		}
 
 		CommonTypes::putString($out, $this->baseGameVersion);
-		$this->experiments->write($out);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_16_100){
+			$this->experiments->write($out);
+		}else{
+			CommonTypes::putBool($out, false); //isExperimental
+		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_20_80){
 			CommonTypes::putBool($out, $this->useVanillaEditorPacks);
 		}
