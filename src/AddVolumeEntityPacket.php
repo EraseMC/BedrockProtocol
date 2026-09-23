@@ -89,7 +89,7 @@ class AddVolumeEntityPacket extends DataPacket implements ClientboundPacket{
 				$this->dimension = VarInt::readSignedInt($in);
 			}
 		}
-		$this->engineVersion = CommonTypes::getString($in);
+		$this->engineVersion = $protocolId >= ProtocolInfo::PROTOCOL_1_17_30 ? CommonTypes::getString($in) : "";
 	}
 
 	protected function encodePayload(ByteBufferWriter $out, int $protocolId) : void{
@@ -104,7 +104,9 @@ class AddVolumeEntityPacket extends DataPacket implements ClientboundPacket{
 				VarInt::writeSignedInt($out, $this->dimension);
 			}
 		}
-		CommonTypes::putString($out, $this->engineVersion);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_17_30){
+			CommonTypes::putString($out, $this->engineVersion);
+		}
 	}
 
 	public function handle(PacketHandlerInterface $handler) : bool{

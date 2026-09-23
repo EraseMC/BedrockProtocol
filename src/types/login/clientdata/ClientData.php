@@ -155,8 +155,8 @@ final class ClientData{
 	/** @required */
 	public string $SkinGeometryData;
 
-	/** @required */
-	public string $SkinGeometryDataEngineVersion;
+	/** Introduced in 1.17.30; absent from earlier 1.17 client data. */
+	public string $SkinGeometryDataEngineVersion = "";
 
 	/** @required */
 	public string $SkinId;

@@ -206,8 +206,10 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 			$this->playerActorProperties = new CacheableNbt(CommonTypes::getNbtCompoundRoot($in));
 			$this->blockPaletteChecksum = LE::readUnsignedLong($in);
 			$this->worldTemplateId = CommonTypes::getUUID($in);
-		}else{
+		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_18_0){
 			$this->blockPaletteChecksum = LE::readUnsignedLong($in);
+		}else{
+			$this->blockPaletteChecksum = 0;
 		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_20){
 			$this->enableClientSideChunkGeneration = CommonTypes::getBool($in);
@@ -271,7 +273,7 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 			$out->writeByteArray($this->playerActorProperties->getEncodedNbt());
 			LE::writeUnsignedLong($out, $this->blockPaletteChecksum);
 			CommonTypes::putUUID($out, $this->worldTemplateId);
-		}else{
+		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_18_0){
 			LE::writeUnsignedLong($out, $this->blockPaletteChecksum);
 		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_20){

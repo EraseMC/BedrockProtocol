@@ -127,6 +127,10 @@ final class ProtocolInfo{
 	public const PROTOCOL_1_18_30 = 503;
 	public const PROTOCOL_1_18_10 = 486;
 	public const PROTOCOL_1_18_0 = 475;
+	public const PROTOCOL_1_17_40 = 471;
+	public const PROTOCOL_1_17_30 = 465;
+	public const PROTOCOL_1_17_10 = 448;
+	public const PROTOCOL_1_17_0 = 440;
 
 	public const LOGIN_PACKET = 0x01;
 	public const PLAY_STATUS_PACKET = 0x02;

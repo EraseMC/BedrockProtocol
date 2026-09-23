@@ -19,6 +19,20 @@ use PHPUnit\Framework\TestCase;
 
 final class ProtocolInfoTest extends TestCase{
 	/** @phpstan-return \Generator<string, array{int, int}> */
+	public static function stable1_17ProtocolProvider() : \Generator{
+		yield '1.17.0' => [ProtocolInfo::PROTOCOL_1_17_0, 440];
+		yield '1.17.10' => [ProtocolInfo::PROTOCOL_1_17_10, 448];
+		yield '1.17.30' => [ProtocolInfo::PROTOCOL_1_17_30, 465];
+		yield '1.17.40' => [ProtocolInfo::PROTOCOL_1_17_40, 471];
+	}
+
+	#[DataProvider('stable1_17ProtocolProvider')]
+	public function testStable1_17ProtocolConstants(int $actual, int $expected) : void{
+		self::assertSame($expected, $actual);
+		self::assertNotContains($actual, ProtocolInfo::ACCEPTED_PROTOCOL);
+	}
+
+	/** @phpstan-return \Generator<string, array{int, int}> */
 	public static function stable1_18ProtocolProvider() : \Generator{
 		yield '1.18.0' => [ProtocolInfo::PROTOCOL_1_18_0, 475];
 		yield '1.18.10' => [ProtocolInfo::PROTOCOL_1_18_10, 486];

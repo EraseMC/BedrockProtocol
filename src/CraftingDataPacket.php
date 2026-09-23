@@ -198,7 +198,7 @@ class CraftingDataPacket extends DataPacket implements ClientboundPacket{
 		}
 		$this->potionTypeRecipes = CommonTypes::readList($in, PotionTypeRecipe::decode(...));
 		$this->potionContainerRecipes = CommonTypes::readList($in, PotionContainerChangeRecipe::decode(...));
-		$this->materialReducerRecipes = CommonTypes::readList($in, MaterialReducerRecipe::decode(...));
+		$this->materialReducerRecipes = $protocolId >= ProtocolInfo::PROTOCOL_1_17_30 ? CommonTypes::readList($in, MaterialReducerRecipe::decode(...)) : [];
 		$this->cleanRecipes = CommonTypes::getBool($in);
 	}
 
@@ -240,7 +240,9 @@ class CraftingDataPacket extends DataPacket implements ClientboundPacket{
 		}
 		CommonTypes::writeList($out, $this->potionTypeRecipes, fn(ByteBufferWriter $out, PotionTypeRecipe $recipe) => $recipe->encode($out));
 		CommonTypes::writeList($out, $this->potionContainerRecipes, fn(ByteBufferWriter $out, PotionContainerChangeRecipe $recipe) => $recipe->encode($out));
-		CommonTypes::writeList($out, $this->materialReducerRecipes, fn(ByteBufferWriter $out, MaterialReducerRecipe $recipe) => $recipe->encode($out));
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_17_30){
+			CommonTypes::writeList($out, $this->materialReducerRecipes, fn(ByteBufferWriter $out, MaterialReducerRecipe $recipe) => $recipe->encode($out));
+		}
 		CommonTypes::putBool($out, $this->cleanRecipes);
 	}
 

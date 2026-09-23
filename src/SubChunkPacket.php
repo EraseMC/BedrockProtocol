@@ -75,7 +75,7 @@ class SubChunkPacket extends DataPacket implements ClientboundPacket{
 				$this->entries[] = SubChunkPacketEntry::read($in, $protocolId, $this->cacheEnabled);
 			}
 		}else{
-			$this->entries = [SubChunkPacketEntry::read($in, $protocolId, true)];
+			$this->entries = [SubChunkPacketEntry::read($in, $protocolId, $protocolId >= ProtocolInfo::PROTOCOL_1_18_0)];
 			$this->cacheEnabled = $this->entries[0]->getUsedBlobHash() !== null;
 		}
 	}
@@ -97,7 +97,7 @@ class SubChunkPacket extends DataPacket implements ClientboundPacket{
 			throw new \InvalidArgumentException("SubChunkPacket requires exactly one entry before 1.18.10");
 		}
 		foreach($this->entries as $entry){
-			$entry->write($out, $protocolId, $newSubChunkFormat ? $this->cacheEnabled : true);
+			$entry->write($out, $protocolId, $newSubChunkFormat ? $this->cacheEnabled : $protocolId >= ProtocolInfo::PROTOCOL_1_18_0);
 		}
 	}
 
