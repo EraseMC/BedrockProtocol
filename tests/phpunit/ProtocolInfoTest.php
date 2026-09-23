@@ -31,7 +31,7 @@ final class ProtocolInfoTest extends TestCase{
 	#[DataProvider('stable1_16ProtocolProvider')]
 	public function testStable1_16ProtocolConstants(int $actual, int $expected) : void{
 		self::assertSame($expected, $actual);
-		self::assertNotContains($actual, ProtocolInfo::ACCEPTED_PROTOCOL);
+		self::assertContains($actual, ProtocolInfo::ACCEPTED_PROTOCOL);
 	}
 
 	/** @phpstan-return \Generator<string, array{int, int}> */
