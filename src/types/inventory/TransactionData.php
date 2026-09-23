@@ -18,6 +18,7 @@ use pmmp\encoding\ByteBufferReader;
 use pmmp\encoding\ByteBufferWriter;
 use pmmp\encoding\DataDecodeException;
 use pocketmine\network\mcpe\protocol\PacketDecodeException;
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\CommonTypes;
 
 abstract class TransactionData{
@@ -52,6 +53,11 @@ abstract class TransactionData{
 	 */
 	final public function decodeAuthInput(ByteBufferReader $in, int $protocolId) : void{
 		$this->actions = CommonTypes::readList($in, static fn($in) => (new NetworkInventoryAction())->readAuthInput($in, $protocolId));
+		if($protocolId <= ProtocolInfo::PROTOCOL_1_17_40){
+			// In 1.17, ItemInteractionData contains the complete UseItemTransactionData.
+			// The action list alone is not the end of the payload.
+			$this->decodeData($in, $protocolId);
+		}
 	}
 
 	/**
@@ -67,6 +73,9 @@ abstract class TransactionData{
 
 	final public function encodeAuthInput(ByteBufferWriter $out, int $protocolId) : void{
 		CommonTypes::writeList($out, $this->actions, static fn($out, $a) => $a->writeAuthInput($out, $protocolId));
+		if($protocolId <= ProtocolInfo::PROTOCOL_1_17_40){
+			$this->encodeData($out, $protocolId);
+		}
 	}
 
 	abstract protected function encodeData(ByteBufferWriter $out, int $protocolId) : void;

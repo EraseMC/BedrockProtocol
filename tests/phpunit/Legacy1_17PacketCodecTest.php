@@ -8,6 +8,9 @@ use PHPUnit\Framework\TestCase;
 use pmmp\encoding\ByteBufferReader;
 use pmmp\encoding\ByteBufferWriter;
 use pmmp\encoding\VarInt;
+use pocketmine\math\Vector3;
+use pocketmine\network\mcpe\protocol\serializer\CommonTypes;
+use pocketmine\network\mcpe\protocol\types\BlockPosition;
 use pocketmine\network\mcpe\protocol\types\SubChunkPacketEntry;
 use pocketmine\network\mcpe\protocol\types\SubChunkPacketHeightMapType;
 use pocketmine\network\mcpe\protocol\types\SubChunkPosition;
@@ -17,6 +20,9 @@ use pocketmine\network\mcpe\protocol\types\PlayerAuthInputFlags;
 use pocketmine\network\mcpe\protocol\types\inventory\stackrequest\DeprecatedCraftingNonImplementedStackRequestAction;
 use pocketmine\network\mcpe\protocol\types\inventory\stackrequest\DeprecatedCraftingResultsStackRequestAction;
 use pocketmine\network\mcpe\protocol\types\inventory\stackrequest\ItemStackRequest;
+use pocketmine\network\mcpe\protocol\types\inventory\ItemStack;
+use pocketmine\network\mcpe\protocol\types\inventory\ItemStackWrapper;
+use pocketmine\network\mcpe\protocol\types\inventory\UseItemTransactionData;
 
 final class Legacy1_17PacketCodecTest extends TestCase{
 	private static function encode(DataPacket $packet, int $protocolId) : string{
@@ -87,5 +93,34 @@ final class Legacy1_17PacketCodecTest extends TestCase{
 				self::assertSame($wire, $out->getData());
 			}
 		}
+	}
+
+	public function test1_17InteractionDataPrecedesBlockActions() : void{
+		$protocolId = ProtocolInfo::PROTOCOL_1_17_0;
+		$origin = new BlockPosition(0, 0, 0);
+		$out = new ByteBufferWriter();
+		$out->writeByteArray(hex2bin('9001') . str_repeat("\x00", 32));
+		VarInt::writeUnsignedLong($out, (1 << PlayerAuthInputFlags::PERFORM_ITEM_INTERACTION) | (1 << PlayerAuthInputFlags::PERFORM_BLOCK_ACTIONS));
+		$out->writeByteArray(str_repeat("\x00", 3 + 12)); // input mode, play mode, tick, delta
+		VarInt::writeSignedInt($out, 0); // interaction request ID
+		VarInt::writeUnsignedInt($out, 0); // inventory action count
+		VarInt::writeUnsignedInt($out, UseItemTransactionData::ACTION_BREAK_BLOCK);
+		CommonTypes::putBlockPosition($out, $origin);
+		VarInt::writeSignedInt($out, 0); // face
+		VarInt::writeSignedInt($out, 0); // hotbar slot
+		CommonTypes::putItemStackWrapper($out, $protocolId, ItemStackWrapper::legacy(ItemStack::null()), false);
+		CommonTypes::putVector3($out, new Vector3(0, 0, 0)); // player position
+		CommonTypes::putVector3($out, new Vector3(0, 0, 0)); // click position
+		VarInt::writeUnsignedInt($out, 0); // block runtime ID
+		VarInt::writeSignedInt($out, 1); // one block action
+		VarInt::writeSignedInt($out, 0); // START_BREAK
+		CommonTypes::putBlockPosition($out, $origin);
+		VarInt::writeSignedInt($out, 0); // face
+
+		$packet = new PlayerAuthInputPacket();
+		$packet->decode(new ByteBufferReader($out->getData()), $protocolId);
+		self::assertSame(UseItemTransactionData::ACTION_BREAK_BLOCK, $packet->getItemInteractionData()?->getTransactionData()->getActionType());
+		self::assertCount(1, $packet->getBlockActions());
+		self::assertSame(0, $packet->getBlockActions()[0]->getActionType());
 	}
 }
