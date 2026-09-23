@@ -97,6 +97,12 @@ final class ItemStackRequest{
 				}
 			}else{
 				$innerTypeId = Byte::readUnsigned($in);
+				// 1.18 added grindstone and loom before the two deprecated
+				// crafting actions. 1.17 wire IDs 14/15 therefore map to
+				// modern IDs 18/19, not to grindstone/loom.
+				if($protocolId < ProtocolInfo::PROTOCOL_1_18_0 && $innerTypeId >= 14){
+					$innerTypeId += 2;
+				}
 				if($protocolId < ProtocolInfo::PROTOCOL_1_18_10 && $innerTypeId >= ItemStackRequestActionType::INNER_TYPES[ItemStackRequestActionType::LAB_TABLE_COMBINE]){
 					$innerTypeId += 2;
 				}
@@ -120,6 +126,9 @@ final class ItemStackRequest{
 			}
 			$innerTypeId = ItemStackRequestActionType::INNER_TYPES[$action->getTypeId()];
 			if($protocolId < ProtocolInfo::PROTOCOL_1_18_10 && $innerTypeId >= ItemStackRequestActionType::INNER_TYPES[ItemStackRequestActionType::LAB_TABLE_COMBINE]){
+				$innerTypeId -= 2;
+			}
+			if($protocolId < ProtocolInfo::PROTOCOL_1_18_0 && $innerTypeId >= 16){
 				$innerTypeId -= 2;
 			}
 			Byte::writeUnsigned($out, $innerTypeId);

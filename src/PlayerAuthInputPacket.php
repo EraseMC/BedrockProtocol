@@ -336,7 +336,10 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 			}else{
 				throw new PacketDecodeException("Vehicle rotation and actor unique ID must both be present or both be absent");
 			}
-		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_18_0){
+		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_17_0){
+			// Real 1.17 clients using server-authoritative movement send these
+			// flag-gated fields too. Historical servers used legacy movement and
+			// did not exercise this layout.
 			if($this->inputFlags->get(PlayerAuthInputFlags::PERFORM_ITEM_INTERACTION)){
 				$this->itemInteractionData = ItemInteractionData::read($in, $protocolId);
 			}
@@ -424,7 +427,7 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 				CommonTypes::writeDoubleOptional($out, $this->vehicleInfo?->getVehicleRotation(), CommonTypes::putVector2(...));
 				CommonTypes::writeDoubleOptional($out, $this->vehicleInfo?->getPredictedVehicleActorUniqueId(), CommonTypes::putActorUniqueId(...));
 			}
-		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_18_0){
+		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_17_0){
 			if($this->itemInteractionData !== null){
 				$this->itemInteractionData->write($out, $protocolId);
 			}

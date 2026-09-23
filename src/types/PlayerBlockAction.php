@@ -45,7 +45,7 @@ final class PlayerBlockAction{
 		$actionType = VarInt::readSignedInt($in);
 		if(!self::isValidActionType($actionType)){
 			//make sure we throw the correct exception type
-			throw new PacketDecodeException("Invalid action type for " . self::class);
+			throw new PacketDecodeException("Invalid action type $actionType for " . self::class);
 		}
 		if($protocolId < ProtocolInfo::PROTOCOL_1_26_40 && $actionType === PlayerAction::STOP_BREAK){
 			return new self($actionType, new BlockPosition(0, 0, 0), 0);

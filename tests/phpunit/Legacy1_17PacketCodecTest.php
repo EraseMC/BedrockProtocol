@@ -14,6 +14,9 @@ use pocketmine\network\mcpe\protocol\types\SubChunkPosition;
 use pocketmine\network\mcpe\protocol\types\SubChunkPositionOffset;
 use pocketmine\network\mcpe\protocol\types\SubChunkRequestResult;
 use pocketmine\network\mcpe\protocol\types\PlayerAuthInputFlags;
+use pocketmine\network\mcpe\protocol\types\inventory\stackrequest\DeprecatedCraftingNonImplementedStackRequestAction;
+use pocketmine\network\mcpe\protocol\types\inventory\stackrequest\DeprecatedCraftingResultsStackRequestAction;
+use pocketmine\network\mcpe\protocol\types\inventory\stackrequest\ItemStackRequest;
 
 final class Legacy1_17PacketCodecTest extends TestCase{
 	private static function encode(DataPacket $packet, int $protocolId) : string{
@@ -53,15 +56,36 @@ final class Legacy1_17PacketCodecTest extends TestCase{
 		self::assertSame(1, $decoded->getBaseSubChunkPosition()->getX());
 	}
 
-	public function test1_17AuthInputDoesNotParse1_18BlockActionExtension() : void{
+	public function test1_17AuthInputParsesFlaggedBlockActions() : void{
 		$out = new ByteBufferWriter();
 		$out->writeByteArray(hex2bin('9001') . str_repeat("\x00", 32));
 		VarInt::writeUnsignedLong($out, 1 << PlayerAuthInputFlags::PERFORM_BLOCK_ACTIONS);
 		$out->writeByteArray(str_repeat("\x00", 3 + 12)); // input mode, play mode, tick, delta
+		$out->writeByteArray(hex2bin('020000000000')); // one START_BREAK action at 0,0,0 face 0
 		$legacyWire = $out->getData();
 		$packet = new PlayerAuthInputPacket();
 		$packet->decode(new ByteBufferReader($legacyWire), ProtocolInfo::PROTOCOL_1_17_0);
 		self::assertTrue($packet->getInputFlags()->get(PlayerAuthInputFlags::PERFORM_BLOCK_ACTIONS));
-		self::assertNull($packet->getBlockActions());
+		self::assertCount(1, $packet->getBlockActions());
+		self::assertSame(0, $packet->getBlockActions()[0]->getActionType());
+		$roundTrip = new PlayerAuthInputPacket();
+		$roundTrip->decode(new ByteBufferReader(self::encode($packet, ProtocolInfo::PROTOCOL_1_17_0)), ProtocolInfo::PROTOCOL_1_17_0);
+		self::assertCount(1, $roundTrip->getBlockActions());
+	}
+
+	public function test1_17DeprecatedCraftingActionIds() : void{
+		foreach([ProtocolInfo::PROTOCOL_1_17_0, ProtocolInfo::PROTOCOL_1_17_10, ProtocolInfo::PROTOCOL_1_17_30, ProtocolInfo::PROTOCOL_1_17_40] as $protocolId){
+			foreach([
+				'02010e00' => DeprecatedCraftingNonImplementedStackRequestAction::class,
+				'02010f000000' => DeprecatedCraftingResultsStackRequestAction::class,
+			] as $hex => $expectedClass){
+				$wire = hex2bin($hex);
+				$decoded = ItemStackRequest::read(new ByteBufferReader($wire), $protocolId);
+				self::assertInstanceOf($expectedClass, $decoded->getActions()[0]);
+				$out = new ByteBufferWriter();
+				$decoded->write($out, $protocolId);
+				self::assertSame($wire, $out->getData());
+			}
+		}
 	}
 }
