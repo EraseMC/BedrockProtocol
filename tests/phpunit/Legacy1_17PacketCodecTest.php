@@ -7,11 +7,13 @@ namespace pocketmine\network\mcpe\protocol;
 use PHPUnit\Framework\TestCase;
 use pmmp\encoding\ByteBufferReader;
 use pmmp\encoding\ByteBufferWriter;
+use pmmp\encoding\VarInt;
 use pocketmine\network\mcpe\protocol\types\SubChunkPacketEntry;
 use pocketmine\network\mcpe\protocol\types\SubChunkPacketHeightMapType;
 use pocketmine\network\mcpe\protocol\types\SubChunkPosition;
 use pocketmine\network\mcpe\protocol\types\SubChunkPositionOffset;
 use pocketmine\network\mcpe\protocol\types\SubChunkRequestResult;
+use pocketmine\network\mcpe\protocol\types\PlayerAuthInputFlags;
 
 final class Legacy1_17PacketCodecTest extends TestCase{
 	private static function encode(DataPacket $packet, int $protocolId) : string{
@@ -49,5 +51,17 @@ final class Legacy1_17PacketCodecTest extends TestCase{
 		$decoded = new SubChunkPacket();
 		$decoded->decode(new ByteBufferReader($old), ProtocolInfo::PROTOCOL_1_17_40);
 		self::assertSame(1, $decoded->getBaseSubChunkPosition()->getX());
+	}
+
+	public function test1_17AuthInputDoesNotParse1_18BlockActionExtension() : void{
+		$out = new ByteBufferWriter();
+		$out->writeByteArray(hex2bin('9001') . str_repeat("\x00", 32));
+		VarInt::writeUnsignedLong($out, 1 << PlayerAuthInputFlags::PERFORM_BLOCK_ACTIONS);
+		$out->writeByteArray(str_repeat("\x00", 3 + 12)); // input mode, play mode, tick, delta
+		$legacyWire = $out->getData();
+		$packet = new PlayerAuthInputPacket();
+		$packet->decode(new ByteBufferReader($legacyWire), ProtocolInfo::PROTOCOL_1_17_0);
+		self::assertTrue($packet->getInputFlags()->get(PlayerAuthInputFlags::PERFORM_BLOCK_ACTIONS));
+		self::assertNull($packet->getBlockActions());
 	}
 }
