@@ -30,6 +30,10 @@ class LevelSoundEventPacket extends DataPacket implements ClientboundPacket, Ser
 	 * (and any proxy decoding the packet). Anything above the last ID a profile knows is sent as its UNDEFINED sound.
 	 */
 	private const LEGACY_LAST_SOUND_ID = [
+		ProtocolInfo::PROTOCOL_1_17_0 => 330,
+		ProtocolInfo::PROTOCOL_1_17_10 => 330,
+		ProtocolInfo::PROTOCOL_1_17_30 => 330,
+		ProtocolInfo::PROTOCOL_1_17_40 => 330,
 		ProtocolInfo::PROTOCOL_1_18_0 => 375,
 		ProtocolInfo::PROTOCOL_1_18_10 => 375,
 		ProtocolInfo::PROTOCOL_1_18_30 => 375,

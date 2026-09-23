@@ -95,4 +95,11 @@ final class Legacy1_18PacketCodecTest extends TestCase{
 		$oldSound = LevelSoundEventPacket::nonActorSound(LevelSoundEvent::HIT, new Vector3(0, 0, 0), false);
 		self::assertSame(hex2bin('7b01') . $tail, self::encode($oldSound, ProtocolInfo::PROTOCOL_1_18_10));
 	}
+
+	public function testLevelSoundEventClampsNewerSoundsIn1_17() : void{
+		$newSound = LevelSoundEventPacket::nonActorSound(LevelSoundEvent::PRESSURE_PLATE_CLICK_ON, new Vector3(0, 0, 0), false);
+		$tail = hex2bin('00000000000000000000000001013a0000');
+		self::assertSame(hex2bin('7bca02') . $tail, self::encode($newSound, ProtocolInfo::PROTOCOL_1_17_0));
+		self::assertSame(hex2bin('7bca02') . $tail, self::encode($newSound, ProtocolInfo::PROTOCOL_1_17_40));
+	}
 }
