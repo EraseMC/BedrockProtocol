@@ -30,6 +30,8 @@ use function count;
 use function hexdec;
 use function is_int;
 use function preg_match;
+use function str_contains;
+use function strtolower;
 
 final class ClientDataToSkinDataHelper{
 
@@ -60,6 +62,19 @@ final class ClientDataToSkinDataHelper{
 		}
 
 		return Color::fromARGB($argb);
+	}
+
+	/**
+	 * Clients before 1.17.30 leave ArmSize empty, so the arm width is taken from the geometry the skin asks for.
+	 *
+	 * @throws \InvalidArgumentException
+	 */
+	private static function parseArmSize(string $armSize, string $resourcePatch) : SkinArmSizeType{
+		if($armSize !== ""){
+			return SkinArmSizeType::fromPacket($armSize);
+		}
+
+		return str_contains(strtolower(self::safeB64Decode($resourcePatch, "SkinResourcePatch")), "slim") ? SkinArmSizeType::SLIM : SkinArmSizeType::WIDE;
 	}
 
 	/**
@@ -128,8 +143,8 @@ final class ClientDataToSkinDataHelper{
 			self::safeB64Decode($clientData->SkinAnimationData, "SkinAnimationData"),
 			$clientData->CapeId,
 			null,
-			SkinArmSizeType::fromPacket($clientData->ArmSize),
-			self::parseColorString($clientData->SkinColor),
+			self::parseArmSize($clientData->ArmSize, $clientData->SkinResourcePatch),
+			$clientData->SkinColor === "" ? null : self::parseColorString($clientData->SkinColor),
 			array_values(array_map(self::parsePersonaSkinPiece(...), $clientData->PersonaPieces)),
 			array_values(array_map(self::parsePersonaPieceTintColor(...), $clientData->PieceTintColors)),
 			$clientData->TrustedSkin ? SkinData::TRUSTED_SKIN_TRUE : SkinData::TRUSTED_SKIN_FALSE,
