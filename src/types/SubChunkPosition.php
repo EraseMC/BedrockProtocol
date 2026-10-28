@@ -33,23 +33,45 @@ final class SubChunkPosition{
 
 	public function getZ() : int{ return $this->z; }
 
-	public static function read(ByteBufferReader $in, bool $varInts = false) : self{
-		$x = $varInts ? VarInt::readSignedInt($in) : LE::readSignedInt($in);
-		$y = $varInts ? VarInt::readSignedInt($in) : LE::readSignedInt($in);
-		$z = $varInts ? VarInt::readSignedInt($in) : LE::readSignedInt($in);
+	/**
+	 * Reads the position as fixed-width LE ints (current format).
+	 */
+	public static function read(ByteBufferReader $in) : self{
+		$x = LE::readSignedInt($in);
+		$y = LE::readSignedInt($in);
+		$z = LE::readSignedInt($in);
 
 		return new self($x, $y, $z);
 	}
 
-	public function write(ByteBufferWriter $out, bool $varInts = false) : void{
-		if($varInts){
-			VarInt::writeSignedInt($out, $this->x);
-			VarInt::writeSignedInt($out, $this->y);
-			VarInt::writeSignedInt($out, $this->z);
-		}else{
-			LE::writeSignedInt($out, $this->x);
-			LE::writeSignedInt($out, $this->y);
-			LE::writeSignedInt($out, $this->z);
-		}
+	/**
+	 * Reads the position as VarInts. Only used by older protocols:
+	 * SubChunkRequestPacket (<= 1.26.20) and SubChunkPacket (<= 1.26.30).
+	 */
+	public static function readVarInts(ByteBufferReader $in) : self{
+		$x = VarInt::readSignedInt($in);
+		$y = VarInt::readSignedInt($in);
+		$z = VarInt::readSignedInt($in);
+
+		return new self($x, $y, $z);
+	}
+
+	/**
+	 * Writes the position as fixed-width LE ints (current format).
+	 */
+	public function write(ByteBufferWriter $out) : void{
+		LE::writeSignedInt($out, $this->x);
+		LE::writeSignedInt($out, $this->y);
+		LE::writeSignedInt($out, $this->z);
+	}
+
+	/**
+	 * Writes the position as VarInts. Only used by older protocols:
+	 * SubChunkRequestPacket (<= 1.26.20) and SubChunkPacket (<= 1.26.30).
+	 */
+	public function writeVarInts(ByteBufferWriter $out) : void{
+		VarInt::writeSignedInt($out, $this->x);
+		VarInt::writeSignedInt($out, $this->y);
+		VarInt::writeSignedInt($out, $this->z);
 	}
 }

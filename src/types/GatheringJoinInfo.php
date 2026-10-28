@@ -26,6 +26,11 @@ use Ramsey\Uuid\UuidInterface;
  */
 final class GatheringJoinInfo{
 
+	/**
+	 * Before 1.26.40 experienceWorldId, experienceWorldName, targetId, scenarioId and serverId were not optional; null
+	 * values are written as a nil UUID / empty string for those protocols.
+	 * targetId, scenarioId and serverId only exist since 1.26.10 (null when decoding older protocols).
+	 */
 	public function __construct(
 		private UuidInterface $experienceId,
 		private string $experienceName,
@@ -59,19 +64,19 @@ final class GatheringJoinInfo{
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			$experienceWorldId = CommonTypes::readOptional($in, CommonTypes::getUUID(...));
 			$experienceWorldName = CommonTypes::readOptional($in, CommonTypes::getString(...));
-		}else{
-			$experienceWorldId = CommonTypes::getUUID($in);
-			$experienceWorldName = CommonTypes::getString($in);
-		}
-		$creatorId = CommonTypes::getString($in);
-		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+			$creatorId = CommonTypes::getString($in);
 			$targetId = CommonTypes::readOptional($in, CommonTypes::getUUID(...));
 			$scenarioId = CommonTypes::readOptional($in, CommonTypes::getString(...));
 			$serverId = CommonTypes::readOptional($in, CommonTypes::getString(...));
-		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_26_10){
-			$targetId = CommonTypes::getUUID($in);
-			$scenarioId = CommonTypes::getString($in);
-			$serverId = CommonTypes::getString($in);
+		}else{
+			$experienceWorldId = CommonTypes::getUUID($in);
+			$experienceWorldName = CommonTypes::getString($in);
+			$creatorId = CommonTypes::getString($in);
+			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_10){
+				$targetId = CommonTypes::getUUID($in);
+				$scenarioId = CommonTypes::getString($in);
+				$serverId = CommonTypes::getString($in);
+			}
 		}
 
 		return new self(
@@ -80,9 +85,9 @@ final class GatheringJoinInfo{
 			$experienceWorldId,
 			$experienceWorldName,
 			$creatorId,
-			$targetId ?? Uuid::uuid4(),
-			$scenarioId ?? "",
-			$serverId ?? "",
+			$targetId ?? null,
+			$scenarioId ?? null,
+			$serverId ?? null,
 		);
 	}
 
@@ -92,19 +97,19 @@ final class GatheringJoinInfo{
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			CommonTypes::writeOptional($out, $this->experienceWorldId, CommonTypes::putUUID(...));
 			CommonTypes::writeOptional($out, $this->experienceWorldName, CommonTypes::putString(...));
-		}else{
-			CommonTypes::putUUID($out, $this->experienceWorldId ?? throw new \InvalidArgumentException("experienceWorldId must be set"));
-			CommonTypes::putString($out, $this->experienceWorldName ?? throw new \InvalidArgumentException("experienceWorldName must be set"));
-		}
-		CommonTypes::putString($out, $this->creatorId);
-		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+			CommonTypes::putString($out, $this->creatorId);
 			CommonTypes::writeOptional($out, $this->targetId, CommonTypes::putUUID(...));
 			CommonTypes::writeOptional($out, $this->scenarioId, CommonTypes::putString(...));
 			CommonTypes::writeOptional($out, $this->serverId, CommonTypes::putString(...));
-		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_26_10){
-			CommonTypes::putUUID($out, $this->targetId ?? throw new \InvalidArgumentException("targetId must be set"));
-			CommonTypes::putString($out, $this->scenarioId ?? throw new \InvalidArgumentException("scenarioId must be set"));
-			CommonTypes::putString($out, $this->serverId ?? throw new \InvalidArgumentException("serverId must be set"));
+		}else{
+			CommonTypes::putUUID($out, $this->experienceWorldId ?? Uuid::fromString(Uuid::NIL));
+			CommonTypes::putString($out, $this->experienceWorldName ?? "");
+			CommonTypes::putString($out, $this->creatorId);
+			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_10){
+				CommonTypes::putUUID($out, $this->targetId ?? Uuid::fromString(Uuid::NIL));
+				CommonTypes::putString($out, $this->scenarioId ?? "");
+				CommonTypes::putString($out, $this->serverId ?? "");
+			}
 		}
 	}
 }

@@ -24,7 +24,8 @@ class AnvilDamagePacket extends DataPacket implements ServerboundPacket{
 	public const NETWORK_ID = ProtocolInfo::ANVIL_DAMAGE_PACKET;
 
 	private BlockPosition $blockPosition;
-	private int $damageAmount;
+	/** <= ProtocolInfo::PROTOCOL_1_26_30 */
+	private int $damageAmount = 0;
 
 	/**
 	 * @generate-create-func
@@ -43,14 +44,14 @@ class AnvilDamagePacket extends DataPacket implements ServerboundPacket{
 	public function getBlockPosition() : BlockPosition{ return $this->blockPosition; }
 
 	protected function decodePayload(ByteBufferReader $in, int $protocolId) : void{
-		if($protocolId < ProtocolInfo::PROTOCOL_1_26_40){
+		if($protocolId <= ProtocolInfo::PROTOCOL_1_26_30){
 			$this->damageAmount = Byte::readUnsigned($in);
 		}
 		$this->blockPosition = CommonTypes::getBlockPosition($in, $protocolId >= ProtocolInfo::PROTOCOL_1_26_10);
 	}
 
 	protected function encodePayload(ByteBufferWriter $out, int $protocolId) : void{
-		if($protocolId < ProtocolInfo::PROTOCOL_1_26_40){
+		if($protocolId <= ProtocolInfo::PROTOCOL_1_26_30){
 			Byte::writeUnsigned($out, $this->damageAmount);
 		}
 		CommonTypes::putBlockPosition($out, $this->blockPosition, $protocolId >= ProtocolInfo::PROTOCOL_1_26_10);

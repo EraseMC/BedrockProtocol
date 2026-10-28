@@ -18,7 +18,6 @@ use pmmp\encoding\ByteBufferReader;
 use pmmp\encoding\ByteBufferWriter;
 use pmmp\encoding\DataDecodeException;
 use pocketmine\network\mcpe\protocol\PacketDecodeException;
-use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\CommonTypes;
 
 abstract class TransactionData{
@@ -40,24 +39,16 @@ abstract class TransactionData{
 	abstract public function getTypeId() : int;
 
 	/**
+	 * @param bool $authInput whether this is the transaction of a PlayerAuthInputPacket item interaction (selects the
+	 *                        legacy action layout for older protocols, see NetworkInventoryAction::read())
+	 * @param bool $legacyHasItemStackIds see NetworkInventoryAction::read()
+	 *
 	 * @throws DataDecodeException
 	 * @throws PacketDecodeException
 	 */
-	final public function decodeTransaction(ByteBufferReader $in, int $protocolId, bool $legacyHasItemStackIds = false) : void{
-		$this->actions = CommonTypes::readList($in, static fn($in) => (new NetworkInventoryAction())->readTransaction($in, $protocolId, $legacyHasItemStackIds));
+	final public function decode(ByteBufferReader $in, int $protocolId, bool $authInput = false, bool $legacyHasItemStackIds = false) : void{
+		$this->actions = CommonTypes::readList($in, static fn(ByteBufferReader $in) => (new NetworkInventoryAction())->read($in, $protocolId, $authInput, $legacyHasItemStackIds));
 		$this->decodeData($in, $protocolId);
-	}
-
-	/**
-	 * @throws DataDecodeException
-	 */
-	final public function decodeAuthInput(ByteBufferReader $in, int $protocolId) : void{
-		$this->actions = CommonTypes::readList($in, static fn($in) => (new NetworkInventoryAction())->readAuthInput($in, $protocolId));
-		if($protocolId <= ProtocolInfo::PROTOCOL_1_17_40){
-			// In 1.17, ItemInteractionData contains the complete UseItemTransactionData.
-			// The action list alone is not the end of the payload.
-			$this->decodeData($in, $protocolId);
-		}
 	}
 
 	/**
@@ -66,16 +57,12 @@ abstract class TransactionData{
 	 */
 	abstract protected function decodeData(ByteBufferReader $in, int $protocolId) : void;
 
-	final public function encodeTransaction(ByteBufferWriter $out, int $protocolId, bool $legacyHasItemStackIds = false) : void{
-		CommonTypes::writeList($out, $this->actions, static fn($out, $a) => $a->writeTransaction($out, $protocolId, $legacyHasItemStackIds));
+	/**
+	 * @see TransactionData::decode() for the meaning of $authInput
+	 */
+	final public function encode(ByteBufferWriter $out, int $protocolId, bool $authInput = false, bool $legacyHasItemStackIds = false) : void{
+		CommonTypes::writeList($out, $this->actions, static fn(ByteBufferWriter $out, NetworkInventoryAction $a) => $a->write($out, $protocolId, $authInput, $legacyHasItemStackIds));
 		$this->encodeData($out, $protocolId);
-	}
-
-	final public function encodeAuthInput(ByteBufferWriter $out, int $protocolId) : void{
-		CommonTypes::writeList($out, $this->actions, static fn($out, $a) => $a->writeAuthInput($out, $protocolId));
-		if($protocolId <= ProtocolInfo::PROTOCOL_1_17_40){
-			$this->encodeData($out, $protocolId);
-		}
 	}
 
 	abstract protected function encodeData(ByteBufferWriter $out, int $protocolId) : void;

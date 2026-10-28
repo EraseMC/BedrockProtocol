@@ -11,7 +11,6 @@
  */
 
 declare(strict_types=1);
-
 namespace pocketmine\network\mcpe\protocol\types\recipe;
 
 use pmmp\encoding\ByteBufferWriter;

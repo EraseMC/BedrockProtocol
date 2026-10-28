@@ -30,11 +30,6 @@ final class MapImage{
 	public const MAX_HEIGHT = 128;
 	public const MAX_WIDTH = 128;
 
-	/** < ProtocolInfo::PROTOCOL_1_26_40 */
-	private const PIXEL_FORMAT_LEGACY = 0;
-	/** >= ProtocolInfo::PROTOCOL_1_26_40 */
-	private const PIXEL_FORMAT_NEW = 1;
-
 	private int $width;
 	private int $height;
 	/**
@@ -42,10 +37,10 @@ final class MapImage{
 	 * @phpstan-var list<list<Color>>
 	 */
 	private array $pixels;
-
 	/**
+	 * Encoded pixels, keyed by pixel format (see {@link MapImage::usesLegacyPixelFormat()})
 	 * @var string[]
-	 * @phpstan-var array<self::PIXEL_FORMAT_*, string>
+	 * @phpstan-var array<int, string>
 	 */
 	private array $encodedPixelCache = [];
 
@@ -86,23 +81,32 @@ final class MapImage{
 	 */
 	public function getPixels() : array{ return $this->pixels; }
 
+	/**
+	 * Pixels are BE ints (RGBA) since 1.26.40; before that they were VarInts of the byte-flipped RGBA value.
+	 */
+	private static function usesLegacyPixelFormat(int $protocolId) : bool{
+		return $protocolId <= ProtocolInfo::PROTOCOL_1_26_30;
+	}
+
 	public function encode(ByteBufferWriter $out, int $protocolId) : void{
-		$format = $protocolId >= ProtocolInfo::PROTOCOL_1_26_40 ? self::PIXEL_FORMAT_NEW : self::PIXEL_FORMAT_LEGACY;
-		if(!isset($this->encodedPixelCache[$format])){
+		$legacy = self::usesLegacyPixelFormat($protocolId);
+		$cacheKey = $legacy ? 0 : 1;
+		if(!isset($this->encodedPixelCache[$cacheKey])){
 			$serializer = new ByteBufferWriter();
 			for($y = 0; $y < $this->height; ++$y){
 				for($x = 0; $x < $this->width; ++$x){
-					if($format === self::PIXEL_FORMAT_NEW){
-						BE::writeSignedInt($serializer, $this->pixels[$y][$x]->toRGBA());
-					}else{
+					if($legacy){
+						//if mojang had any sense this would just be a regular LE int
 						VarInt::writeUnsignedInt($serializer, Binary::flipIntEndianness($this->pixels[$y][$x]->toRGBA()));
+					}else{
+						BE::writeUnsignedInt($serializer, $this->pixels[$y][$x]->toRGBA());
 					}
 				}
 			}
-			$this->encodedPixelCache[$format] = $serializer->getData();
+			$this->encodedPixelCache[$cacheKey] = $serializer->getData();
 		}
 
-		$out->writeByteArray($this->encodedPixelCache[$format]);
+		$out->writeByteArray($this->encodedPixelCache[$cacheKey]);
 	}
 
 	/**
@@ -118,12 +122,11 @@ final class MapImage{
 		}
 		$pixels = [];
 
+		$legacy = self::usesLegacyPixelFormat($protocolId);
 		for($y = 0; $y < $height; ++$y){
 			$row = [];
 			for($x = 0; $x < $width; ++$x){
-				$row[] = $protocolId >= ProtocolInfo::PROTOCOL_1_26_40 ?
-					Color::fromRGBA(BE::readSignedInt($in)) :
-					Color::fromRGBA(Binary::flipIntEndianness(VarInt::readUnsignedInt($in)));
+				$row[] = Color::fromRGBA($legacy ? Binary::flipIntEndianness(VarInt::readUnsignedInt($in)) : BE::readUnsignedInt($in));
 			}
 			$pixels[] = $row;
 		}

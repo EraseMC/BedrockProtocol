@@ -30,7 +30,7 @@ class CreativeContentPacket extends DataPacket implements ClientboundPacket{
 	public const CATEGORY_ITEMS = 4;
 
 	/** @var CreativeGroupEntry[] */
-	private array $groups;
+	private array $groups = [];
 	/** @var CreativeItemEntry[] */
 	private array $items;
 

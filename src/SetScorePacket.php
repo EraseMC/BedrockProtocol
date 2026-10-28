@@ -22,14 +22,21 @@ use pmmp\encoding\VarInt;
 use pocketmine\network\mcpe\protocol\serializer\CommonTypes;
 use pocketmine\network\mcpe\protocol\types\ScorePacketEntry;
 use pocketmine\network\mcpe\protocol\types\ScorePacketEntryAction;
+use function count;
 
 class SetScorePacket extends DataPacket implements ClientboundPacket{
 	public const NETWORK_ID = ProtocolInfo::SET_SCORE_PACKET;
 
+	/*
+	 * Legacy (<= 1.26.30) packet-level type. Since 1.26.40 every entry carries its own ScorePacketEntryAction; for
+	 * older protocols the packet type is derived from the entries' actions (which therefore must not mix REMOVE with
+	 * CHANGE_* actions).
+	 */
+	/** @deprecated use ScorePacketEntryAction on each entry */
 	public const TYPE_CHANGE = 0;
+	/** @deprecated use ScorePacketEntryAction::REMOVE on each entry */
 	public const TYPE_REMOVE = 1;
 
-	public int $type;
 	/**
 	 * @var ScorePacketEntry[]
 	 * @phpstan-var list<ScorePacketEntry>
@@ -41,9 +48,8 @@ class SetScorePacket extends DataPacket implements ClientboundPacket{
 	 * @param ScorePacketEntry[] $entries
 	 * @phpstan-param list<ScorePacketEntry> $entries
 	 */
-	public static function create(int $type, array $entries) : self{
+	public static function create(array $entries) : self{
 		$result = new self;
-		$result->type = $type;
 		$result->entries = $entries;
 		return $result;
 	}
@@ -55,29 +61,24 @@ class SetScorePacket extends DataPacket implements ClientboundPacket{
 	public function getEntries() : array{ return $this->entries; }
 
 	protected function decodePayload(ByteBufferReader $in, int $protocolId) : void{
-		if($protocolId < ProtocolInfo::PROTOCOL_1_26_40){
-			$this->type = Byte::readUnsigned($in);
-		}
-		$this->entries = CommonTypes::readList($in, function(ByteBufferReader $in) use ($protocolId) : ScorePacketEntry{
-			$entry = new ScorePacketEntry();
-
-			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+			$this->entries = CommonTypes::readList($in, function(ByteBufferReader $in) use ($protocolId) : ScorePacketEntry{
 				$action = ScorePacketEntryAction::fromOrdinal(VarInt::readUnsignedInt($in));
 				$innerType = CommonTypes::getString($in);
 				if($action !== ScorePacketEntryAction::fromPacket($innerType)){
 					throw new PacketDecodeException("Expected inner type {$action->value} for score packet entry ordinal {$action->toOrdinal()}, got $innerType");
 				}
+
+				$entry = new ScorePacketEntry();
 				$entry->action = $action;
 
 				//same for all types
 				$entry->scoreboardId = VarInt::readSignedLong($in);
 
 				if($action === ScorePacketEntryAction::REMOVE){
-					if($protocolId >= ProtocolInfo::PROTOCOL_1_26_44 && $protocolId < ProtocolInfo::PROTOCOL_1_26_45){
-						$entry->objectiveName = CommonTypes::readDoubleOptional($in, CommonTypes::getString(...));
-					}else{
-						$entry->objectiveName = CommonTypes::readOptional($in, CommonTypes::getString(...));
-					}
+					$entry->objectiveName = $protocolId === ProtocolInfo::PROTOCOL_1_26_44 ?
+						CommonTypes::readDoubleOptional($in, CommonTypes::getString(...)) :
+						CommonTypes::readOptional($in, CommonTypes::getString(...));
 				}elseif($action === ScorePacketEntryAction::CHANGE_PLAYER || $action === ScorePacketEntryAction::CHANGE_ENTITY){
 					$entry->objectiveName = CommonTypes::getString($in);
 					$entry->score = LE::readSignedInt($in);
@@ -89,38 +90,35 @@ class SetScorePacket extends DataPacket implements ClientboundPacket{
 				}else{ // this should never be the case
 					throw new \LogicException("Unhandled decode for action: " . $action->name);
 				}
-			}else{
+				return $entry;
+			});
+		}else{
+			$this->entries = [];
+			$type = Byte::readUnsigned($in);
+			for($i = 0, $i2 = VarInt::readUnsignedInt($in); $i < $i2; ++$i){
+				$entry = new ScorePacketEntry();
 				$entry->scoreboardId = VarInt::readSignedLong($in);
 				$entry->objectiveName = CommonTypes::getString($in);
 				$entry->score = LE::readSignedInt($in);
-				if($this->type === self::TYPE_REMOVE){
-					$entry->action = ScorePacketEntryAction::REMOVE;
-				}else{
-					$type = Byte::readUnsigned($in);
-					$entry->action = match($type){
-						ScorePacketEntry::TYPE_PLAYER => ScorePacketEntryAction::CHANGE_PLAYER,
-						ScorePacketEntry::TYPE_ENTITY => ScorePacketEntryAction::CHANGE_ENTITY,
-						ScorePacketEntry::TYPE_FAKE_PLAYER => ScorePacketEntryAction::CHANGE_FAKE_PLAYER,
-						default => throw new PacketDecodeException("Unknown entry type $type"),
-					};
+				if($type !== self::TYPE_REMOVE){
+					$entryType = Byte::readUnsigned($in);
+					$entry->action = self::actionFromLegacyEntryType($entryType) ?? throw new PacketDecodeException("Unknown entry type $entryType");
 					if($entry->action === ScorePacketEntryAction::CHANGE_FAKE_PLAYER){
 						$entry->customName = CommonTypes::getString($in);
 					}else{
 						$entry->actorUniqueId = CommonTypes::getActorUniqueId($in);
 					}
+				}else{
+					$entry->action = ScorePacketEntryAction::REMOVE;
 				}
+				$this->entries[] = $entry;
 			}
-			return $entry;
-		});
+		}
 	}
 
 	protected function encodePayload(ByteBufferWriter $out, int $protocolId) : void{
-		if($protocolId < ProtocolInfo::PROTOCOL_1_26_40){
-			Byte::writeUnsigned($out, $this->type);
-		}
-
-		CommonTypes::writeList($out, $this->entries, function(ByteBufferWriter $out, ScorePacketEntry $entry) use ($protocolId) : void{
-			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+			CommonTypes::writeList($out, $this->entries, function(ByteBufferWriter $out, ScorePacketEntry $entry) use ($protocolId) : void{
 				VarInt::writeUnsignedInt($out, $entry->action->toOrdinal());
 				CommonTypes::putString($out, $entry->action->value);
 
@@ -128,7 +126,7 @@ class SetScorePacket extends DataPacket implements ClientboundPacket{
 				VarInt::writeSignedLong($out, $entry->scoreboardId);
 
 				if($entry->action === ScorePacketEntryAction::REMOVE){
-					if($protocolId >= ProtocolInfo::PROTOCOL_1_26_44 && $protocolId < ProtocolInfo::PROTOCOL_1_26_45){
+					if($protocolId === ProtocolInfo::PROTOCOL_1_26_44){
 						CommonTypes::writeDoubleOptional($out, $entry->objectiveName, CommonTypes::putString(...));
 					}else{
 						CommonTypes::writeOptional($out, $entry->objectiveName, CommonTypes::putString(...));
@@ -144,27 +142,60 @@ class SetScorePacket extends DataPacket implements ClientboundPacket{
 				}else{ // this should never be the case
 					throw new \LogicException("Unhandled encode for action: " . $entry->action->name);
 				}
-			}else{
-				VarInt::writeSignedLong($out, $entry->scoreboardId);
-				CommonTypes::putString($out, $entry->objectiveName ?? "");
-				LE::writeSignedInt($out, $entry->score);
-				if($this->type === self::TYPE_REMOVE){
-					return;
-				}
-
-				Byte::writeUnsigned($out, match($entry->action){
-					ScorePacketEntryAction::CHANGE_PLAYER => ScorePacketEntry::TYPE_PLAYER,
-					ScorePacketEntryAction::CHANGE_ENTITY => ScorePacketEntry::TYPE_ENTITY,
-					ScorePacketEntryAction::CHANGE_FAKE_PLAYER => ScorePacketEntry::TYPE_FAKE_PLAYER,
-					ScorePacketEntryAction::REMOVE => throw new \InvalidArgumentException("REMOVE entries require the packet type to be TYPE_REMOVE before 1.26.40"),
-				});
-				if($entry->action === ScorePacketEntryAction::CHANGE_FAKE_PLAYER){
-					CommonTypes::putString($out, $entry->customName ?? throw new \InvalidArgumentException("CustomName must be set for this entry type"));
-				}else{
-					CommonTypes::putActorUniqueId($out, $entry->actorUniqueId ?? throw new \InvalidArgumentException("ActorUniqueId must be set for this entry type"));
+			});
+		}else{
+			$isRemove = null;
+			foreach($this->entries as $entry){
+				$entryIsRemove = $entry->action === ScorePacketEntryAction::REMOVE;
+				if($isRemove === null){
+					$isRemove = $entryIsRemove;
+				}elseif($isRemove !== $entryIsRemove){
+					throw new \InvalidArgumentException("Protocols older than 1.26.40 cannot mix REMOVE and CHANGE entries in a single SetScorePacket");
 				}
 			}
-		});
+			Byte::writeUnsigned($out, $isRemove === true ? self::TYPE_REMOVE : self::TYPE_CHANGE);
+			VarInt::writeUnsignedInt($out, count($this->entries));
+			foreach($this->entries as $entry){
+				VarInt::writeSignedLong($out, $entry->scoreboardId);
+				if($entry->action === ScorePacketEntryAction::REMOVE){
+					CommonTypes::putString($out, $entry->objectiveName ?? "");
+					LE::writeSignedInt($out, $entry->score);
+				}else{
+					CommonTypes::putString($out, $entry->objectiveName ?? throw new \InvalidArgumentException("ObjectiveName must be set for this entry type"));
+					LE::writeSignedInt($out, $entry->score);
+					Byte::writeUnsigned($out, self::actionToLegacyEntryType($entry->action));
+					if($entry->action === ScorePacketEntryAction::CHANGE_FAKE_PLAYER){
+						CommonTypes::putString($out, $entry->customName ?? throw new \InvalidArgumentException("CustomName must be set for this entry type"));
+					}else{
+						CommonTypes::putActorUniqueId($out, $entry->actorUniqueId ?? throw new \InvalidArgumentException("ActorUniqueId must be set for this entry type"));
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * Maps a <= 1.26.30 entry type (ScorePacketEntry::TYPE_*) to its ScorePacketEntryAction.
+	 */
+	private static function actionFromLegacyEntryType(int $type) : ?ScorePacketEntryAction{
+		return match($type){
+			ScorePacketEntry::TYPE_PLAYER => ScorePacketEntryAction::CHANGE_PLAYER,
+			ScorePacketEntry::TYPE_ENTITY => ScorePacketEntryAction::CHANGE_ENTITY,
+			ScorePacketEntry::TYPE_FAKE_PLAYER => ScorePacketEntryAction::CHANGE_FAKE_PLAYER,
+			default => null,
+		};
+	}
+
+	/**
+	 * Maps a CHANGE_* ScorePacketEntryAction to its <= 1.26.30 entry type (ScorePacketEntry::TYPE_*).
+	 */
+	private static function actionToLegacyEntryType(ScorePacketEntryAction $action) : int{
+		return match($action){
+			ScorePacketEntryAction::CHANGE_PLAYER => ScorePacketEntry::TYPE_PLAYER,
+			ScorePacketEntryAction::CHANGE_ENTITY => ScorePacketEntry::TYPE_ENTITY,
+			ScorePacketEntryAction::CHANGE_FAKE_PLAYER => ScorePacketEntry::TYPE_FAKE_PLAYER,
+			ScorePacketEntryAction::REMOVE => throw new \InvalidArgumentException("REMOVE has no legacy entry type"),
+		};
 	}
 
 	public function handle(PacketHandlerInterface $handler) : bool{

@@ -32,6 +32,7 @@ use pocketmine\network\mcpe\protocol\types\PlayerBlockAction;
 use pocketmine\network\mcpe\protocol\types\PlayMode;
 use function assert;
 use function count;
+use function min;
 
 class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 	public const NETWORK_ID = ProtocolInfo::PLAYER_AUTH_INPUT_PACKET;
@@ -43,9 +44,9 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 	private float $moveVecX;
 	private float $moveVecZ;
 	private BitSet $inputFlags;
-	private int $inputMode;
-	private int $playMode;
-	private int $interactionMode;
+	private InputMode $inputMode;
+	private PlayMode $playMode;
+	private InteractionMode $interactionMode;
 	private ?Vector3 $vrGazeDirection = null;
 	private Vector2 $interactRotation;
 	private int $tick;
@@ -76,9 +77,9 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 		float $moveVecX,
 		float $moveVecZ,
 		BitSet $inputFlags,
-		int $inputMode,
-		int $playMode,
-		int $interactionMode,
+		InputMode $inputMode,
+		PlayMode $playMode,
+		InteractionMode $interactionMode,
 		?Vector3 $vrGazeDirection,
 		Vector2 $interactRotation,
 		int $tick,
@@ -120,9 +121,6 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 
 	/**
 	 * @param BitSet                   $inputFlags @see PlayerAuthInputFlags
-	 * @param int                      $inputMode @see InputMode
-	 * @param int                      $playMode @see PlayMode
-	 * @param int                      $interactionMode @see InteractionMode
 	 * @param PlayerBlockAction[]|null $blockActions Blocks that the client has interacted with
 	 * @phpstan-param list<PlayerBlockAction>|null $blockActions
 	 */
@@ -134,9 +132,9 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 		float $moveVecX,
 		float $moveVecZ,
 		BitSet $inputFlags,
-		int $inputMode,
-		int $playMode,
-		int $interactionMode,
+		InputMode $inputMode,
+		PlayMode $playMode,
+		InteractionMode $interactionMode,
 		?Vector3 $vrGazeDirection,
 		Vector2 $interactRotation,
 		int $tick,
@@ -154,11 +152,12 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 			throw new \InvalidArgumentException("Input flags must be " . PlayerAuthInputFlags::NUMBER_OF_FLAGS . " bits long");
 		}
 
-		if($playMode === PlayMode::VR and $vrGazeDirection === null){
+		if($playMode === PlayMode::REALITY and $vrGazeDirection === null){
 			//yuck, can we get a properly written packet just once? ...
 			throw new \InvalidArgumentException("Gaze direction must be provided for VR play mode");
 		}
 
+		//TODO: are these still needed in 26.40?
 		$inputFlags->set(PlayerAuthInputFlags::PERFORM_ITEM_STACK_REQUEST, $itemStackRequest !== null);
 		$inputFlags->set(PlayerAuthInputFlags::PERFORM_ITEM_INTERACTION, $itemInteractionData !== null);
 		$inputFlags->set(PlayerAuthInputFlags::PERFORM_BLOCK_ACTIONS, $blockActions !== null);
@@ -221,24 +220,15 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 		return $this->inputFlags;
 	}
 
-	/**
-	 * @see InputMode
-	 */
-	public function getInputMode() : int{
+	public function getInputMode() : InputMode{
 		return $this->inputMode;
 	}
 
-	/**
-	 * @see PlayMode
-	 */
-	public function getPlayMode() : int{
+	public function getPlayMode() : PlayMode{
 		return $this->playMode;
 	}
 
-	/**
-	 * @see InteractionMode
-	 */
-	public function getInteractionMode() : int{
+	public function getInteractionMode() : InteractionMode{
 		return $this->interactionMode;
 	}
 
@@ -290,25 +280,36 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 		$this->moveVecZ = LE::readFloat($in);
 		$this->headYaw = LE::readFloat($in);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
-			if($protocolId < ProtocolInfo::PROTOCOL_1_26_50){
+			if($protocolId <= ProtocolInfo::PROTOCOL_1_26_45){
 				CommonTypes::readDummyOptional($in);
 			}
 			$this->inputFlags = new BitSet(PlayerAuthInputFlags::NUMBER_OF_FLAGS);
 			foreach(CommonTypes::readList($in, VarInt::readSignedInt(...)) as $flag){
+				if($flag < 0 || $flag >= PlayerAuthInputFlags::NUMBER_OF_FLAGS){
+					throw new PacketDecodeException("Input flag $flag is out of range");
+				}
 				if($this->inputFlags->get($flag)){
 					throw new PacketDecodeException("Duplicate input flag $flag");
 				}
 				$this->inputFlags->set($flag, true);
 			}
 		}else{
-			$this->inputFlags = BitSet::read($in, $protocolId >= ProtocolInfo::PROTOCOL_1_21_50 ? PlayerAuthInputFlags::NUMBER_OF_FLAGS - 1 : 64);
+			//normalize to the current flag count, so that callers can always query any known flag
+			$legacyLength = self::getLegacyInputFlagsLength($protocolId);
+			$legacyFlags = BitSet::read($in, $legacyLength);
+			$this->inputFlags = new BitSet(PlayerAuthInputFlags::NUMBER_OF_FLAGS);
+			for($i = 0; $i < $legacyLength; ++$i){
+				if($legacyFlags->get($i)){
+					$this->inputFlags->set($i, true);
+				}
+			}
 		}
-		$this->inputMode = VarInt::readUnsignedInt($in);
-		$this->playMode = VarInt::readUnsignedInt($in);
-		$this->interactionMode = $protocolId < ProtocolInfo::PROTOCOL_1_19_0 ? InteractionMode::CROSSHAIR : ($protocolId >= ProtocolInfo::PROTOCOL_1_26_40 ? VarInt::readSignedInt($in) : VarInt::readUnsignedInt($in));
+		$this->inputMode = InputMode::fromPacket(VarInt::readUnsignedInt($in));
+		$this->playMode = PlayMode::fromPacket(VarInt::readUnsignedInt($in));
+		$this->interactionMode = $protocolId < ProtocolInfo::PROTOCOL_1_19_0 ? InteractionMode::CROSSHAIR : InteractionMode::fromPacket($protocolId >= ProtocolInfo::PROTOCOL_1_26_40 ? VarInt::readSignedInt($in) : VarInt::readUnsignedInt($in));
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_21_40){
 			$this->interactRotation = CommonTypes::getVector2($in);
-		}elseif($this->playMode === PlayMode::VR){
+		}elseif($this->playMode === PlayMode::REALITY){
 			$this->vrGazeDirection = CommonTypes::getVector3($in);
 		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_16_100){
@@ -375,12 +376,6 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 	}
 
 	protected function encodePayload(ByteBufferWriter $out, int $protocolId) : void{
-		$inputFlags = $this->inputFlags;
-
-		if($this->vehicleInfo !== null && $protocolId >= ProtocolInfo::PROTOCOL_1_20_60){
-			$inputFlags->set(PlayerAuthInputFlags::IN_CLIENT_PREDICTED_VEHICLE, true);
-		}
-
 		LE::writeFloat($out, $this->pitch);
 		LE::writeFloat($out, $this->yaw);
 		CommonTypes::putVector3($out, $this->position);
@@ -388,31 +383,40 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 		LE::writeFloat($out, $this->moveVecZ);
 		LE::writeFloat($out, $this->headYaw);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
-			if($protocolId < ProtocolInfo::PROTOCOL_1_26_50){
+			if($protocolId <= ProtocolInfo::PROTOCOL_1_26_45){
 				CommonTypes::writeDummyOptional($out);
 			}
 			$flagsArray = [];
-			for($i = 0; $i < PlayerAuthInputFlags::NUMBER_OF_FLAGS; ++$i){
+			$flagCount = min($this->inputFlags->getLength(), PlayerAuthInputFlags::NUMBER_OF_FLAGS);
+			for($i = 0; $i < $flagCount; ++$i){
 				if($this->inputFlags->get($i)){
 					$flagsArray[] = $i;
 				}
 			}
 			CommonTypes::writeList($out, $flagsArray, VarInt::writeSignedInt(...));
 		}else{
-			$this->inputFlags->write($out, $protocolId >= ProtocolInfo::PROTOCOL_1_21_50 ? PlayerAuthInputFlags::NUMBER_OF_FLAGS - 1 : 64);
+			//before 1.26.40, the presence of the optional fields below was determined by these flags
+			$inputFlags = clone $this->inputFlags;
+			$inputFlags->set(PlayerAuthInputFlags::PERFORM_ITEM_INTERACTION, $this->itemInteractionData !== null);
+			$inputFlags->set(PlayerAuthInputFlags::PERFORM_ITEM_STACK_REQUEST, $this->itemStackRequest !== null);
+			$inputFlags->set(PlayerAuthInputFlags::PERFORM_BLOCK_ACTIONS, $this->blockActions !== null);
+			if($this->vehicleInfo !== null && $protocolId >= ProtocolInfo::PROTOCOL_1_20_60){
+				$inputFlags->set(PlayerAuthInputFlags::IN_CLIENT_PREDICTED_VEHICLE, true);
+			}
+			$inputFlags->write($out, self::getLegacyInputFlagsLength($protocolId));
 		}
-		VarInt::writeUnsignedInt($out, $this->inputMode);
-		VarInt::writeUnsignedInt($out, $this->playMode);
+		VarInt::writeUnsignedInt($out, $this->inputMode->value);
+		VarInt::writeUnsignedInt($out, $this->playMode->value);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_0){
 			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
-				VarInt::writeSignedInt($out, $this->interactionMode);
+				VarInt::writeSignedInt($out, $this->interactionMode->value);
 			}else{
-				VarInt::writeUnsignedInt($out, $this->interactionMode);
+				VarInt::writeUnsignedInt($out, $this->interactionMode->value);
 			}
 		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_21_40){
 			CommonTypes::putVector2($out, $this->interactRotation);
-		}elseif($this->playMode === PlayMode::VR){
+		}elseif($this->playMode === PlayMode::REALITY){
 			assert($this->vrGazeDirection !== null);
 			CommonTypes::putVector3($out, $this->vrGazeDirection);
 		}
@@ -461,6 +465,16 @@ class PlayerAuthInputPacket extends DataPacket implements ServerboundPacket{
 				CommonTypes::putVector2($out, $this->rawMove);
 			}
 		}
+	}
+
+	/**
+	 * Number of bits in the input flags bitset for protocols older than 1.26.40.
+	 */
+	private static function getLegacyInputFlagsLength(int $protocolId) : int{
+		return match(true){
+			$protocolId >= ProtocolInfo::PROTOCOL_1_21_50 => 65,
+			default => 64,
+		};
 	}
 
 	public function handle(PacketHandlerInterface $handler) : bool{

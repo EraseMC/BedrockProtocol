@@ -11,7 +11,6 @@
  */
 
 declare(strict_types=1);
-
 namespace pocketmine\network\mcpe\protocol\types\recipe;
 
 use pmmp\encoding\ByteBufferReader;
@@ -19,7 +18,7 @@ use pmmp\encoding\ByteBufferWriter;
 use pocketmine\network\mcpe\protocol\serializer\CommonTypes;
 
 /**
- * No longer sent since 1.26.40.
+ * Only used by protocols older than 1.26.40.
  */
 final class ComplexAliasItemDescriptor implements ItemDescriptor{
 

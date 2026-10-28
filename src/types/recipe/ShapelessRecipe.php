@@ -92,15 +92,16 @@ final class ShapelessRecipe{
 		$uuid = CommonTypes::getUUID($in);
 		$block = CommonTypes::getString($in);
 		$priority = VarInt::readSignedInt($in);
+		$unlockingRequirement = null;
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
-			$unlockingRequirement = CommonTypes::readOptional($in, fn(ByteBufferReader $in) => RecipeUnlockingRequirement::read($in, $protocolId));
+			$unlockingRequirement = CommonTypes::readOptional($in, static fn(ByteBufferReader $in) => RecipeUnlockingRequirement::read($in, $protocolId));
 		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_21_0){
 			$unlockingRequirement = RecipeUnlockingRequirement::read($in, $protocolId);
 		}
 
 		$recipeNetId = CommonTypes::readRecipeNetId($in);
 
-		return new self($recipeId, $input, $output, $uuid, $block, $priority, $unlockingRequirement ?? null, $recipeNetId);
+		return new self($recipeId, $input, $output, $uuid, $block, $priority, $unlockingRequirement, $recipeNetId);
 	}
 
 	public function encode(ByteBufferWriter $out, int $protocolId) : void{
@@ -119,9 +120,11 @@ final class ShapelessRecipe{
 		CommonTypes::putString($out, $this->blockName);
 		VarInt::writeSignedInt($out, $this->priority);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
-			CommonTypes::writeOptional($out, $this->unlockingRequirement, fn(ByteBufferWriter $out, RecipeUnlockingRequirement $data) => $data->write($out, $protocolId));
+			CommonTypes::writeOptional($out, $this->unlockingRequirement, static fn(ByteBufferWriter $out, RecipeUnlockingRequirement $data) => $data->write($out, $protocolId));
 		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_21_0){
-			($this->unlockingRequirement ?? new RecipeUnlockingRequirement(RecipeUnlockingContext::NONE, null))->write($out, $protocolId);
+			//the requirement isn't optional on this wire format: no requirement is written as ALWAYS_UNLOCKED, which
+			//is what the old API's `new RecipeUnlockingRequirement(null)` used to encode to
+			($this->unlockingRequirement ?? new RecipeUnlockingRequirement(RecipeUnlockingContext::ALWAYS_UNLOCKED, null))->write($out, $protocolId);
 		}
 
 		CommonTypes::writeRecipeNetId($out, $this->recipeNetId);

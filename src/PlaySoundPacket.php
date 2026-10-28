@@ -30,9 +30,12 @@ class PlaySoundPacket extends DataPacket implements ClientboundPacket{
 	public float $z;
 	public float $volume;
 	public float $pitch;
+	/** >= ProtocolInfo::PROTOCOL_1_26_40 */
 	public int $loopCount = 0;
+	/** >= ProtocolInfo::PROTOCOL_1_26_50 */
 	public bool $bypassListenerRangeCheck = false;
 	public ?int $serverSoundHandle = null;
+	/** >= ProtocolInfo::PROTOCOL_1_26_50 */
 	public ?float $playbackPositionSeconds = null;
 
 	/**

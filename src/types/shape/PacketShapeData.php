@@ -247,7 +247,8 @@ final class PacketShapeData{
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_21_120){
 			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_0){
 				$dimensionId = CommonTypes::readOptional($in, VarInt::readSignedInt(...));
-				$attachedToEntityId = CommonTypes::readOptional($in, CommonTypes::getActorRuntimeId(...));
+				//runtime ID before 1.26.20, unique ID since
+				$attachedToEntityId = CommonTypes::readOptional($in, $protocolId >= ProtocolInfo::PROTOCOL_1_26_20 ? CommonTypes::getActorUniqueId(...) : CommonTypes::getActorRuntimeId(...));
 			}else{
 				$dimensionId = VarInt::readSignedInt($in);
 			}
@@ -322,13 +323,19 @@ final class PacketShapeData{
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_21_120){
 			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_0){
 				CommonTypes::writeOptional($out, $this->dimensionId, VarInt::writeSignedInt(...));
-				CommonTypes::writeOptional($out, $this->attachedToEntityId, CommonTypes::putActorRuntimeId(...));
+				//runtime ID before 1.26.20, unique ID since
+				CommonTypes::writeOptional($out, $this->attachedToEntityId, $protocolId >= ProtocolInfo::PROTOCOL_1_26_20 ? CommonTypes::putActorUniqueId(...) : CommonTypes::putActorRuntimeId(...));
 			}else{
 				VarInt::writeSignedInt($out, $this->dimensionId ?? DimensionIds::OVERWORLD);
 			}
 
 			VarInt::writeUnsignedInt($out, $this->payload?->getTypeId() ?? PrimitiveShapeType::PAYLOAD_TYPE_NONE);
-			$this->payload?->write($out, $protocolId);
+			$payload = $this->payload; //avoid PHPStan purity issue
+			if($payload instanceof PrimitiveShapeTextPayload){
+				$payload->write($out, $protocolId);
+			}else{
+				$payload?->write($out);
+			}
 		}else{
 			CommonTypes::writeOptional($out, $this->payload instanceof PrimitiveShapeTextPayload ? $this->payload->getText() : null, CommonTypes::putString(...));
 			CommonTypes::writeOptional($out, $this->payload instanceof PrimitiveShapeBoxPayload ? $this->payload->getBoxBound() : null, CommonTypes::putVector3(...));

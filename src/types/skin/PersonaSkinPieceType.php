@@ -48,6 +48,7 @@ enum PersonaSkinPieceType : string{
 	case CAPES = 'capes';
 	case CLASSIC_SKIN = 'classicskin';
 	case EMOTE = 'emote';
+	case COCO = 'coco';
 	case UNSUPPORTED = 'unsupported';
 
 	private const JSON_STRING_TO_CASE = [
@@ -97,5 +98,12 @@ enum PersonaSkinPieceType : string{
 
 	public static function fromJsonString(string $raw) : self{
 		return self::JSON_STRING_TO_CASE[$raw] ?? throw new \InvalidArgumentException("Unknown raw '$raw' JSON string case");
+	}
+
+	/**
+	 * Persona piece types were sent as these JSON strings before 1.26.40.
+	 */
+	public static function tryFromJsonString(string $raw) : ?self{
+		return self::JSON_STRING_TO_CASE[$raw] ?? null;
 	}
 }

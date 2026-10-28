@@ -112,20 +112,21 @@ class ResourcePacksInfoPacket extends DataPacket implements ClientboundPacket{
 		}
 
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
-			$this->resourcePackEntries = CommonTypes::readList($in, fn(ByteBufferReader $in) => ResourcePackInfoEntry::read($in, $protocolId));
+			$this->resourcePackEntries = CommonTypes::readList($in, static fn(ByteBufferReader $in) => ResourcePackInfoEntry::read($in, $protocolId));
 		}else{
+			$this->resourcePackEntries = [];
 			$resourcePackCount = LE::readUnsignedShort($in);
 			while($resourcePackCount-- > 0){
 				$this->resourcePackEntries[] = ResourcePackInfoEntry::read($in, $protocolId);
 			}
+		}
 
-			if($protocolId >= ProtocolInfo::PROTOCOL_1_20_30 && $protocolId < ProtocolInfo::PROTOCOL_1_21_40){
-				$this->cdnUrls = [];
-				for($i = 0, $count = VarInt::readUnsignedInt($in); $i < $count; $i++){
-					$packId = CommonTypes::getString($in);
-					$cdnUrl = CommonTypes::getString($in);
-					$this->cdnUrls[$packId] = $cdnUrl;
-				}
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_20_30 && $protocolId < ProtocolInfo::PROTOCOL_1_21_40){
+			$this->cdnUrls = [];
+			for($i = 0, $count = VarInt::readUnsignedInt($in); $i < $count; $i++){
+				$packId = CommonTypes::getString($in);
+				$cdnUrl = CommonTypes::getString($in);
+				$this->cdnUrls[$packId] = $cdnUrl;
 			}
 		}
 	}
@@ -153,18 +154,18 @@ class ResourcePacksInfoPacket extends DataPacket implements ClientboundPacket{
 			CommonTypes::putString($out, $this->worldTemplateVersion);
 		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
-			CommonTypes::writeList($out, $this->resourcePackEntries, fn(ByteBufferWriter $out, ResourcePackInfoEntry $entry) => $entry->write($out, $protocolId));
+			CommonTypes::writeList($out, $this->resourcePackEntries, static fn(ByteBufferWriter $out, ResourcePackInfoEntry $entry) => $entry->write($out, $protocolId));
 		}else{
 			LE::writeUnsignedShort($out, count($this->resourcePackEntries));
 			foreach($this->resourcePackEntries as $entry){
 				$entry->write($out, $protocolId);
 			}
-			if($protocolId >= ProtocolInfo::PROTOCOL_1_20_30 && $protocolId < ProtocolInfo::PROTOCOL_1_21_40){
-				VarInt::writeUnsignedInt($out, count($this->cdnUrls));
-				foreach($this->cdnUrls as $packId => $cdnUrl){
-					CommonTypes::putString($out, $packId);
-					CommonTypes::putString($out, $cdnUrl);
-				}
+		}
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_20_30 && $protocolId < ProtocolInfo::PROTOCOL_1_21_40){
+			VarInt::writeUnsignedInt($out, count($this->cdnUrls));
+			foreach($this->cdnUrls as $packId => $cdnUrl){
+				CommonTypes::putString($out, $packId);
+				CommonTypes::putString($out, $cdnUrl);
 			}
 		}
 	}

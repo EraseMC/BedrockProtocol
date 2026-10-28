@@ -47,13 +47,13 @@ final class MultiRecipe{
 		return $this->recipeNetId;
 	}
 
-	public static function decode(ByteBufferReader $in, int $protocolId) : self{
+	public static function decode(ByteBufferReader $in) : self{
 		$uuid = CommonTypes::getUUID($in);
 		$recipeNetId = CommonTypes::readRecipeNetId($in);
 		return new self($uuid, $recipeNetId);
 	}
 
-	public function encode(ByteBufferWriter $out, int $protocolId) : void{
+	public function encode(ByteBufferWriter $out) : void{
 		CommonTypes::putUUID($out, $this->recipeId);
 		CommonTypes::writeRecipeNetId($out, $this->recipeNetId);
 	}

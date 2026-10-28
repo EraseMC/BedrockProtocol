@@ -35,10 +35,24 @@ final class PlayerBlockAction{
 		}
 	}
 
+	/**
+	 * Before 1.26.40, STOP_BREAK actions carried no block position or face. This creates such an action with a zero
+	 * position and face.
+	 */
+	public static function stopBreak() : self{
+		return new self(PlayerAction::STOP_BREAK, new BlockPosition(0, 0, 0), 0);
+	}
+
 	public function getActionType() : int{ return $this->actionType; }
 
+	/**
+	 * For STOP_BREAK actions decoded from protocols older than 1.26.40, this is always (0, 0, 0).
+	 */
 	public function getBlockPosition() : BlockPosition{ return $this->blockPosition; }
 
+	/**
+	 * For STOP_BREAK actions decoded from protocols older than 1.26.40, this is always 0.
+	 */
 	public function getFace() : int{ return $this->face; }
 
 	public static function read(ByteBufferReader $in, int $protocolId) : self{
@@ -47,8 +61,8 @@ final class PlayerBlockAction{
 			//make sure we throw the correct exception type
 			throw new PacketDecodeException("Invalid action type $actionType for " . self::class);
 		}
-		if($protocolId < ProtocolInfo::PROTOCOL_1_26_40 && $actionType === PlayerAction::STOP_BREAK){
-			return new self($actionType, new BlockPosition(0, 0, 0), 0);
+		if($protocolId <= ProtocolInfo::PROTOCOL_1_26_30 && $actionType === PlayerAction::STOP_BREAK){
+			return self::stopBreak();
 		}
 		$blockPosition = CommonTypes::getBlockPosition($in);
 		$face = VarInt::readSignedInt($in);
@@ -57,7 +71,7 @@ final class PlayerBlockAction{
 
 	public function write(ByteBufferWriter $out, int $protocolId) : void{
 		VarInt::writeSignedInt($out, $this->actionType);
-		if($protocolId < ProtocolInfo::PROTOCOL_1_26_40 && $this->actionType === PlayerAction::STOP_BREAK){
+		if($protocolId <= ProtocolInfo::PROTOCOL_1_26_30 && $this->actionType === PlayerAction::STOP_BREAK){
 			return;
 		}
 		CommonTypes::putBlockPosition($out, $this->blockPosition);
@@ -66,7 +80,7 @@ final class PlayerBlockAction{
 
 	public static function isValidActionType(int $actionType) : bool{
 		return match($actionType){
-			PlayerAction::STOP_BREAK, //only in 1.26.40+
+			PlayerAction::STOP_BREAK, //only has block info in 1.26.40+
 			PlayerAction::ABORT_BREAK,
 			PlayerAction::START_BREAK,
 			PlayerAction::CRACK_BREAK,

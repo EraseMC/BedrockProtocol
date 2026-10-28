@@ -23,6 +23,7 @@ use pocketmine\nbt\tag\CompoundTag;
 use pocketmine\network\mcpe\protocol\serializer\CommonTypes;
 use pocketmine\network\mcpe\protocol\types\BlockPaletteEntry;
 use pocketmine\network\mcpe\protocol\types\CacheableNbt;
+use pocketmine\network\mcpe\protocol\types\GameMode;
 use pocketmine\network\mcpe\protocol\types\ItemTypeEntry;
 use pocketmine\network\mcpe\protocol\types\LevelSettings;
 use pocketmine\network\mcpe\protocol\types\NetworkPermissions;
@@ -38,7 +39,7 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 
 	public int $actorUniqueId;
 	public int $actorRuntimeId;
-	public int $playerGamemode;
+	public GameMode $playerGamemode;
 
 	public Vector3 $playerPosition;
 
@@ -65,8 +66,9 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 	public bool $blockNetworkIdsAreHashes = false; //new in 1.19.80, possibly useful for multi version
 	public bool $enableTickDeathSystems = false;
 	public NetworkPermissions $networkPermissions;
+	/** >= ProtocolInfo::PROTOCOL_1_26_30 && < ProtocolInfo::PROTOCOL_1_26_40 (removed upstream in 1.26.40) */
 	public bool $isLoggingChat = false;
-	public ?ServerJoinInformation $serverJoinInformation;
+	public ?ServerJoinInformation $serverJoinInformation = null;
 	public ServerTelemetryData $serverTelemetryData;
 
 	/**
@@ -104,7 +106,7 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 	public static function create(
 		int $actorUniqueId,
 		int $actorRuntimeId,
-		int $playerGamemode,
+		GameMode $playerGamemode,
 		Vector3 $playerPosition,
 		float $pitch,
 		float $yaw,
@@ -168,7 +170,7 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 	protected function decodePayload(ByteBufferReader $in, int $protocolId) : void{
 		$this->actorUniqueId = CommonTypes::getActorUniqueId($in);
 		$this->actorRuntimeId = CommonTypes::getActorRuntimeId($in);
-		$this->playerGamemode = VarInt::readSignedInt($in);
+		$this->playerGamemode = GameMode::fromPacket(VarInt::readSignedInt($in));
 
 		$this->playerPosition = CommonTypes::getVector3($in);
 
@@ -234,7 +236,7 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 		}
 		$this->networkPermissions = $protocolId >= ProtocolInfo::PROTOCOL_1_20_0 ? NetworkPermissions::decode($in) : new NetworkPermissions(false);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_0){
-			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_30 && $protocolId < ProtocolInfo::PROTOCOL_1_26_40){
+			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_30 && $protocolId < ProtocolInfo::PROTOCOL_1_26_40){ //removed in 1.26.40
 				$this->isLoggingChat = CommonTypes::getBool($in);
 			}
 			$this->serverJoinInformation = CommonTypes::readOptional($in, fn(ByteBufferReader $in) => ServerJoinInformation::read($in, $protocolId));
@@ -245,7 +247,7 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 	protected function encodePayload(ByteBufferWriter $out, int $protocolId) : void{
 		CommonTypes::putActorUniqueId($out, $this->actorUniqueId);
 		CommonTypes::putActorRuntimeId($out, $this->actorRuntimeId);
-		VarInt::writeSignedInt($out, $this->playerGamemode);
+		VarInt::writeSignedInt($out, $this->playerGamemode->value);
 
 		CommonTypes::putVector3($out, $this->playerPosition);
 
@@ -312,7 +314,7 @@ class StartGamePacket extends DataPacket implements ClientboundPacket{
 			$this->networkPermissions->encode($out);
 		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_0){
-			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_30 && $protocolId < ProtocolInfo::PROTOCOL_1_26_40){
+			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_30 && $protocolId < ProtocolInfo::PROTOCOL_1_26_40){ //removed in 1.26.40
 				CommonTypes::putBool($out, $this->isLoggingChat);
 			}
 			CommonTypes::writeOptional($out, $this->serverJoinInformation, fn(ByteBufferWriter $out, ServerJoinInformation $info) => $info->write($out, $protocolId));

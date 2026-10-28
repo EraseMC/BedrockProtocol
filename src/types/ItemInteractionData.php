@@ -24,8 +24,11 @@ use pocketmine\network\mcpe\protocol\types\inventory\UseItemTransactionData;
 
 final class ItemInteractionData{
 	/**
-	 * @param InventoryTransactionChangedSlotsHack[] $requestChangedSlots
-	 * @phpstan-param list<InventoryTransactionChangedSlotsHack> $requestChangedSlots
+	 * Before 1.26.40, the changed slots were only present if the request ID was non-zero. In that case they are decoded
+	 * as an array (possibly empty), otherwise as null.
+	 *
+	 * @param InventoryTransactionChangedSlotsHack[]|null $requestChangedSlots
+	 * @phpstan-param list<InventoryTransactionChangedSlotsHack>|null $requestChangedSlots
 	 */
 	public function __construct(
 		private int $requestId,
@@ -52,28 +55,30 @@ final class ItemInteractionData{
 	public static function read(ByteBufferReader $in, int $protocolId) : self{
 		$requestId = VarInt::readSignedInt($in);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
-			$requestChangedSlots = CommonTypes::readOptional($in, static fn($in) => CommonTypes::readList($in, InventoryTransactionChangedSlotsHack::read(...)));
-		}elseif($requestId !== 0){
-			$requestChangedSlots = CommonTypes::readList($in, InventoryTransactionChangedSlotsHack::read(...));
+			$requestChangedSlots = CommonTypes::readOptional($in, static fn(ByteBufferReader $in) : array => CommonTypes::readList($in, InventoryTransactionChangedSlotsHack::read(...)));
+			if($protocolId < ProtocolInfo::PROTOCOL_1_26_50){
+				CommonTypes::readDummyOptional($in);
+				CommonTypes::readDummyOptional($in);
+			}
+		}else{
+			$requestChangedSlots = $requestId !== 0 ? CommonTypes::readList($in, InventoryTransactionChangedSlotsHack::read(...)) : null;
 		}
 		$transactionData = new UseItemTransactionData();
-		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
-			CommonTypes::readDummyOptional($in);
-			CommonTypes::readDummyOptional($in);
-		}
-		$transactionData->decodeAuthInput($in, $protocolId);
-		return new ItemInteractionData($requestId, $requestChangedSlots ?? null, $transactionData);
+		$transactionData->decode($in, $protocolId, authInput: true);
+		return new ItemInteractionData($requestId, $requestChangedSlots, $transactionData);
 	}
 
 	public function write(ByteBufferWriter $out, int $protocolId) : void{
 		VarInt::writeSignedInt($out, $this->requestId);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
-			CommonTypes::writeOptional($out, $this->requestChangedSlots, static fn($out, $list) => CommonTypes::writeList($out, $list, static fn($out, $v) => $v->write($out)));
-			CommonTypes::writeDummyOptional($out);
-			CommonTypes::writeDummyOptional($out);
+			CommonTypes::writeOptional($out, $this->requestChangedSlots, static fn(ByteBufferWriter $out, array $list) => CommonTypes::writeList($out, $list, static fn(ByteBufferWriter $out, InventoryTransactionChangedSlotsHack $v) => $v->write($out)));
+			if($protocolId < ProtocolInfo::PROTOCOL_1_26_50){
+				CommonTypes::writeDummyOptional($out);
+				CommonTypes::writeDummyOptional($out);
+			}
 		}elseif($this->requestId !== 0){
-			CommonTypes::writeList($out, $this->requestChangedSlots ?? [], static fn($out, $v) => $v->write($out));
+			CommonTypes::writeList($out, $this->requestChangedSlots ?? [], static fn(ByteBufferWriter $out, InventoryTransactionChangedSlotsHack $v) => $v->write($out));
 		}
-		$this->transactionData->encodeAuthInput($out, $protocolId);
+		$this->transactionData->encode($out, $protocolId, authInput: true);
 	}
 }

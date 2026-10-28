@@ -14,6 +14,7 @@ declare(strict_types=1);
 
 namespace pocketmine\network\mcpe\protocol\types\recipe;
 
+use pmmp\encoding\Byte;
 use pmmp\encoding\ByteBufferReader;
 use pmmp\encoding\ByteBufferWriter;
 use pmmp\encoding\VarInt;
@@ -49,16 +50,23 @@ final class RecipeUnlockingRequirement{
 		//It's basically just an optional list, which could have been done by an empty list wherever it's not needed.
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			$unlockingContext = RecipeUnlockingContext::fromPacket(VarInt::readSignedInt($in));
-			$unlockingIngredients = CommonTypes::readOptional($in, static fn($in) => CommonTypes::readList($in, static fn($in) => CommonTypes::getRecipeIngredient($in, $protocolId)));
+			$unlockingIngredients = CommonTypes::readOptional($in, static fn(ByteBufferReader $in) => CommonTypes::readList($in, static fn(ByteBufferReader $in) => CommonTypes::getRecipeIngredient($in, $protocolId)));
+			if($unlockingContext !== RecipeUnlockingContext::NONE && $unlockingIngredients !== null){
+				//this is a runtime error, make sure the correct exception type is thrown
+				throw new PacketDecodeException("Unlocking ingredients should only be set when context is CONTEXT_NONE");
+			}
 		}else{
-			$unlockingContext = CommonTypes::getBool($in) ? RecipeUnlockingContext::ALWAYS_UNLOCKED : RecipeUnlockingContext::NONE;
-			$unlockingIngredients = $unlockingContext === RecipeUnlockingContext::NONE ?
-				CommonTypes::readList($in, static fn($in) => CommonTypes::getRecipeIngredient($in, $protocolId)) :
-				null;
-		}
-		if($unlockingContext !== RecipeUnlockingContext::NONE && $unlockingIngredients !== null){
-			//this is a runtime error, make sure the correct exception type is thrown
-			throw new PacketDecodeException("Unlocking ingredients should only be set when context is CONTEXT_NONE");
+			//Before 1.26.40 the context was a single byte (previously read here as a bool), and the ingredient list
+			//(VarInt count) followed only when the context was 0 (NONE). The byte values are the same as the
+			//RecipeUnlockingContext enum, so this maps losslessly, except that NONE always has a (possibly empty)
+			//ingredient list on this wire format. Unknown non-zero values were accepted before (anything non-zero
+			//meant "no ingredient list"), so they're mapped to ALWAYS_UNLOCKED instead of being rejected.
+			$rawContext = Byte::readUnsigned($in);
+			$unlockingContext = RecipeUnlockingContext::tryFrom($rawContext) ?? RecipeUnlockingContext::ALWAYS_UNLOCKED;
+			$unlockingIngredients = null;
+			if($unlockingContext === RecipeUnlockingContext::NONE){
+				$unlockingIngredients = CommonTypes::readList($in, static fn(ByteBufferReader $in) => CommonTypes::getRecipeIngredient($in, $protocolId));
+			}
 		}
 
 		return new self($unlockingContext, $unlockingIngredients);
@@ -67,11 +75,12 @@ final class RecipeUnlockingRequirement{
 	public function write(ByteBufferWriter $out, int $protocolId) : void{
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			VarInt::writeSignedInt($out, $this->unlockingContext->value);
-			CommonTypes::writeOptional($out, $this->unlockingIngredients, fn($out, $v) => CommonTypes::writeList($out, $v, fn($out, $i) => CommonTypes::putRecipeIngredient($out, $protocolId, $i)));
+			CommonTypes::writeOptional($out, $this->unlockingIngredients, static fn(ByteBufferWriter $out, array $v) => CommonTypes::writeList($out, $v, static fn(ByteBufferWriter $out, RecipeIngredient $ingredient) => CommonTypes::putRecipeIngredient($out, $protocolId, $ingredient)));
 		}else{
-			CommonTypes::putBool($out, $this->unlockingIngredients === null);
-			if($this->unlockingIngredients !== null){
-				CommonTypes::writeList($out, $this->unlockingIngredients, fn($out, $i) => CommonTypes::putRecipeIngredient($out, $protocolId, $i));
+			//see read() for the mapping
+			Byte::writeUnsigned($out, $this->unlockingContext->value);
+			if($this->unlockingContext === RecipeUnlockingContext::NONE){
+				CommonTypes::writeList($out, $this->unlockingIngredients ?? [], static fn(ByteBufferWriter $out, RecipeIngredient $ingredient) => CommonTypes::putRecipeIngredient($out, $protocolId, $ingredient));
 			}
 		}
 	}

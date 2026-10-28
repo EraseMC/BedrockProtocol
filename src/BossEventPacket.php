@@ -21,6 +21,7 @@ use pmmp\encoding\LE;
 use pmmp\encoding\VarInt;
 use pocketmine\network\mcpe\protocol\serializer\CommonTypes;
 use pocketmine\network\mcpe\protocol\types\BossBarColor;
+use pocketmine\network\mcpe\protocol\types\BossBarOverlay;
 
 class BossEventPacket extends DataPacket implements ClientboundPacket, ServerboundPacket{
 	public const NETWORK_ID = ProtocolInfo::BOSS_EVENT_PACKET;
@@ -47,13 +48,17 @@ class BossEventPacket extends DataPacket implements ClientboundPacket, Serverbou
 	public int $bossActorUniqueId;
 	public int $eventType;
 
+	/**
+	 * Only on the wire for REGISTER_PLAYER/UNREGISTER_PLAYER/QUERY before 1.26.30, and for every event type from 1.26.30
+	 * to 1.26.45. Removed in 1.26.50.
+	 */
 	public int $playerActorUniqueId = 0;
 	public float $healthPercent = 0.0;
 	public string $title = "";
 	public string $filteredTitle = "";
 	public bool $darkenScreen = false;
-	public int $color = BossBarColor::PINK;
-	public int $overlay = 0;
+	public BossBarColor $color = BossBarColor::PINK;
+	public BossBarOverlay $overlay = BossBarOverlay::PROGRESS;
 
 	private static function base(int $bossActorUniqueId, int $eventId) : self{
 		$result = new self;
@@ -62,7 +67,7 @@ class BossEventPacket extends DataPacket implements ClientboundPacket, Serverbou
 		return $result;
 	}
 
-	public static function show(int $bossActorUniqueId, string $title, float $healthPercent, bool $darkenScreen = false, int $color = BossBarColor::PURPLE, int $overlay = 0) : self{
+	public static function show(int $bossActorUniqueId, string $title, float $healthPercent, bool $darkenScreen = false, BossBarColor $color = BossBarColor::PURPLE, BossBarOverlay $overlay = BossBarOverlay::PROGRESS) : self{
 		$result = self::base($bossActorUniqueId, self::TYPE_SHOW);
 		$result->title = $title;
 		$result->filteredTitle = $title;
@@ -77,12 +82,18 @@ class BossEventPacket extends DataPacket implements ClientboundPacket, Serverbou
 		return self::base($bossActorUniqueId, self::TYPE_HIDE);
 	}
 
+	/**
+	 * @param int $playerActorUniqueId only used by protocols older than 1.26.50
+	 */
 	public static function registerPlayer(int $bossActorUniqueId, int $playerActorUniqueId = 0) : self{
 		$result = self::base($bossActorUniqueId, self::TYPE_REGISTER_PLAYER);
 		$result->playerActorUniqueId = $playerActorUniqueId;
 		return $result;
 	}
 
+	/**
+	 * @param int $playerActorUniqueId only used by protocols older than 1.26.50
+	 */
 	public static function unregisterPlayer(int $bossActorUniqueId, int $playerActorUniqueId = 0) : self{
 		$result = self::base($bossActorUniqueId, self::TYPE_UNREGISTER_PLAYER);
 		$result->playerActorUniqueId = $playerActorUniqueId;
@@ -102,7 +113,7 @@ class BossEventPacket extends DataPacket implements ClientboundPacket, Serverbou
 		return $result;
 	}
 
-	public static function properties(int $bossActorUniqueId, bool $darkenScreen, int $color = BossBarColor::PURPLE, int $overlay = 0) : self{
+	public static function properties(int $bossActorUniqueId, bool $darkenScreen, BossBarColor $color = BossBarColor::PURPLE, BossBarOverlay $overlay = BossBarOverlay::PROGRESS) : self{
 		$result = self::base($bossActorUniqueId, self::TYPE_PROPERTIES);
 		$result->darkenScreen = $darkenScreen;
 		$result->color = $color;
@@ -110,6 +121,9 @@ class BossEventPacket extends DataPacket implements ClientboundPacket, Serverbou
 		return $result;
 	}
 
+	/**
+	 * @param int $playerActorUniqueId only used by protocols older than 1.26.50
+	 */
 	public static function query(int $bossActorUniqueId, int $playerActorUniqueId = 0) : self{
 		$result = self::base($bossActorUniqueId, self::TYPE_QUERY);
 		$result->playerActorUniqueId = $playerActorUniqueId;
@@ -119,15 +133,15 @@ class BossEventPacket extends DataPacket implements ClientboundPacket, Serverbou
 	protected function decodePayload(ByteBufferReader $in, int $protocolId) : void{
 		$this->bossActorUniqueId = CommonTypes::getActorUniqueId($in);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_30){
-			if($protocolId < ProtocolInfo::PROTOCOL_1_26_50){
+			if($protocolId <= ProtocolInfo::PROTOCOL_1_26_45){
 				$this->playerActorUniqueId = CommonTypes::getActorUniqueId($in);
 			}
 			$this->eventType = Byte::readUnsigned($in);
 			$this->title = CommonTypes::getString($in);
 			$this->filteredTitle = CommonTypes::getString($in);
 			$this->healthPercent = LE::readFloat($in);
-			$this->color = Byte::readUnsigned($in);
-			$this->overlay = Byte::readUnsigned($in);
+			$this->color = BossBarColor::fromPacket(Byte::readUnsigned($in));
+			$this->overlay = BossBarOverlay::fromPacket(Byte::readUnsigned($in));
 		}else{
 			$this->eventType = VarInt::readUnsignedInt($in);
 			switch($this->eventType){
@@ -151,8 +165,8 @@ class BossEventPacket extends DataPacket implements ClientboundPacket, Serverbou
 						default => throw new PacketDecodeException("Invalid darkenScreen value $raw"),
 					};
 				case self::TYPE_TEXTURE:
-					$this->color = VarInt::readUnsignedInt($in);
-					$this->overlay = VarInt::readUnsignedInt($in);
+					$this->color = BossBarColor::fromPacket(VarInt::readUnsignedInt($in));
+					$this->overlay = BossBarOverlay::fromPacket(VarInt::readUnsignedInt($in));
 					break;
 				case self::TYPE_HEALTH_PERCENT:
 					$this->healthPercent = LE::readFloat($in);
@@ -172,15 +186,15 @@ class BossEventPacket extends DataPacket implements ClientboundPacket, Serverbou
 	protected function encodePayload(ByteBufferWriter $out, int $protocolId) : void{
 		CommonTypes::putActorUniqueId($out, $this->bossActorUniqueId);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_30){
-			if($protocolId < ProtocolInfo::PROTOCOL_1_26_50){
+			if($protocolId <= ProtocolInfo::PROTOCOL_1_26_45){
 				CommonTypes::putActorUniqueId($out, $this->playerActorUniqueId);
 			}
 			Byte::writeUnsigned($out, $this->eventType);
 			CommonTypes::putString($out, $this->title);
 			CommonTypes::putString($out, $this->filteredTitle);
 			LE::writeFloat($out, $this->healthPercent);
-			Byte::writeUnsigned($out, $this->color);
-			Byte::writeUnsigned($out, $this->overlay);
+			Byte::writeUnsigned($out, $this->color->value);
+			Byte::writeUnsigned($out, $this->overlay->value);
 		}else{
 			VarInt::writeUnsignedInt($out, $this->eventType);
 			switch($this->eventType){
@@ -200,8 +214,8 @@ class BossEventPacket extends DataPacket implements ClientboundPacket, Serverbou
 				case self::TYPE_PROPERTIES:
 					LE::writeUnsignedShort($out, $this->darkenScreen ? 1 : 0);
 				case self::TYPE_TEXTURE:
-					VarInt::writeUnsignedInt($out, $this->color);
-					VarInt::writeUnsignedInt($out, $this->overlay);
+					VarInt::writeUnsignedInt($out, $this->color->value);
+					VarInt::writeUnsignedInt($out, $this->overlay->value);
 					break;
 				case self::TYPE_HEALTH_PERCENT:
 					LE::writeFloat($out, $this->healthPercent);

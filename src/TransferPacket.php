@@ -25,7 +25,8 @@ class TransferPacket extends DataPacket implements ClientboundPacket{
 
 	public string $address;
 	public int $port = 19132;
-	public bool $reloadWorld;
+	public bool $reloadWorld = false;
+	/** >= ProtocolInfo::PROTOCOL_1_26_40 */
 	public ?GatheringJoinInfo $gatheringsConfig = null;
 
 	/**
@@ -58,7 +59,7 @@ class TransferPacket extends DataPacket implements ClientboundPacket{
 			CommonTypes::putBool($out, $this->reloadWorld);
 		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
-			CommonTypes::writeOptional($out, $this->gatheringsConfig, fn(ByteBufferWriter $out, GatheringJoinInfo $v) => $v->write($out, $protocolId));
+			CommonTypes::writeOptional($out, $this->gatheringsConfig, fn(ByteBufferWriter $out, GatheringJoinInfo $info) => $info->write($out, $protocolId));
 		}
 	}
 

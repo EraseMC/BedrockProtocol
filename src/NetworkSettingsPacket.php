@@ -33,7 +33,7 @@ class NetworkSettingsPacket extends DataPacket implements ClientboundPacket{
 	public const COMPRESS_EVERYTHING = 1;
 
 	private int $compressionThreshold;
-	private int $compressionAlgorithm = CompressionAlgorithm::ZLIB;
+	private CompressionAlgorithm $compressionAlgorithm = CompressionAlgorithm::ZLIB;
 	private bool $enableClientThrottling = false;
 	private int $clientThrottleThreshold = 0;
 	private float $clientThrottleScalar = 0.0;
@@ -41,7 +41,7 @@ class NetworkSettingsPacket extends DataPacket implements ClientboundPacket{
 	/**
 	 * @generate-create-func
 	 */
-	public static function create(int $compressionThreshold, int $compressionAlgorithm, bool $enableClientThrottling, int $clientThrottleThreshold, float $clientThrottleScalar) : self{
+	public static function create(int $compressionThreshold, CompressionAlgorithm $compressionAlgorithm, bool $enableClientThrottling, int $clientThrottleThreshold, float $clientThrottleScalar) : self{
 		$result = new self;
 		$result->compressionThreshold = $compressionThreshold;
 		$result->compressionAlgorithm = $compressionAlgorithm;
@@ -59,10 +59,7 @@ class NetworkSettingsPacket extends DataPacket implements ClientboundPacket{
 		return $this->compressionThreshold;
 	}
 
-	/**
-	 * @see CompressionAlgorithm
-	 */
-	public function getCompressionAlgorithm() : int{ return $this->compressionAlgorithm; }
+	public function getCompressionAlgorithm() : CompressionAlgorithm{ return $this->compressionAlgorithm; }
 
 	public function isEnableClientThrottling() : bool{ return $this->enableClientThrottling; }
 
@@ -73,7 +70,7 @@ class NetworkSettingsPacket extends DataPacket implements ClientboundPacket{
 	protected function decodePayload(ByteBufferReader $in, int $protocolId) : void{
 		$this->compressionThreshold = LE::readUnsignedShort($in);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_30){
-			$this->compressionAlgorithm = LE::readUnsignedShort($in);
+			$this->compressionAlgorithm = CompressionAlgorithm::fromPacket(LE::readUnsignedShort($in));
 			$this->enableClientThrottling = CommonTypes::getBool($in);
 			$this->clientThrottleThreshold = Byte::readUnsigned($in);
 			$this->clientThrottleScalar = LE::readFloat($in);
@@ -83,7 +80,7 @@ class NetworkSettingsPacket extends DataPacket implements ClientboundPacket{
 	protected function encodePayload(ByteBufferWriter $out, int $protocolId) : void{
 		LE::writeUnsignedShort($out, $this->compressionThreshold);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_30){
-			LE::writeUnsignedShort($out, $this->compressionAlgorithm);
+			LE::writeUnsignedShort($out, $this->compressionAlgorithm->value);
 			CommonTypes::putBool($out, $this->enableClientThrottling);
 			Byte::writeUnsigned($out, $this->clientThrottleThreshold);
 			LE::writeFloat($out, $this->clientThrottleScalar);

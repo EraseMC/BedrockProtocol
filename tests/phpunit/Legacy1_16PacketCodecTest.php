@@ -21,6 +21,7 @@ use pocketmine\network\mcpe\protocol\types\DimensionIds;
 use pocketmine\network\mcpe\protocol\types\entity\IntMetadataProperty;
 use pocketmine\network\mcpe\protocol\types\entity\StringMetadataProperty;
 use pocketmine\network\mcpe\protocol\types\Experiments;
+use pocketmine\network\mcpe\protocol\types\GameMode;
 use pocketmine\network\mcpe\protocol\types\inventory\FullContainerName;
 use pocketmine\network\mcpe\protocol\types\inventory\ItemStack;
 use pocketmine\network\mcpe\protocol\types\inventory\ItemStackExtraData;
@@ -216,7 +217,7 @@ final class Legacy1_16PacketCodecTest extends TestCase{
 		$levelSettings = new LevelSettings();
 		$levelSettings->seed = 1;
 		$levelSettings->spawnSettings = new SpawnSettings(SpawnSettings::BIOME_TYPE_DEFAULT, "", DimensionIds::OVERWORLD);
-		$levelSettings->worldGamemode = 0;
+		$levelSettings->worldGamemode = GameMode::SURVIVAL;
 		$levelSettings->difficulty = 1;
 		$levelSettings->spawnPosition = new BlockPosition(0, 64, 0);
 		$levelSettings->rainLevel = 0;
@@ -224,7 +225,7 @@ final class Legacy1_16PacketCodecTest extends TestCase{
 		$levelSettings->commandsEnabled = true;
 		$levelSettings->gameRules = ["naturalregeneration" => new BoolGameRule(false, false)];
 		$levelSettings->experiments = new Experiments([], false);
-		$packet = StartGamePacket::create(1, 1, 0, new Vector3(0, 64, 0), 0, 0, new CacheableNbt(new CompoundTag()), $levelSettings, "", "world", "", false,
+		$packet = StartGamePacket::create(1, 1, GameMode::SURVIVAL, new Vector3(0, 64, 0), 0, 0, new CacheableNbt(new CompoundTag()), $levelSettings, "", "world", "", false,
 			new PlayerMovementSettings(ServerAuthMovementMode::SERVER_AUTHORITATIVE_V2, 0, false), 0, 0, "", true, "EraseMC", Uuid::fromString(Uuid::NIL),
 			false, false, false, new NetworkPermissions(false), false, null, new ServerTelemetryData("", "", "", ""), [], 0,
 			[new ItemTypeEntry("minecraft:stone", 1, false, -1, new CacheableNbt(new CompoundTag()))]);

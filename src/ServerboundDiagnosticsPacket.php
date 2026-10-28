@@ -52,10 +52,11 @@ class ServerboundDiagnosticsPacket extends DataPacket implements ServerboundPack
 	 */
 	private array $systemDiagnostics = [];
 	/**
-	 * @var SystemCategory[]
-	 * @phpstan-var list<SystemCategory>
+	 * >= ProtocolInfo::PROTOCOL_1_26_40 (optional since ProtocolInfo::PROTOCOL_1_26_60, a list for 1.26.40 - 1.26.50)
+	 * @var SystemCategory[]|null
+	 * @phpstan-var list<SystemCategory>|null
 	 */
-	private array $systemCategories = [];
+	private ?array $systemCategories = null;
 	/**
 	 * @var WhiskerScopeDataSummary[]
 	 * @phpstan-var list<WhiskerScopeDataSummary>
@@ -67,12 +68,12 @@ class ServerboundDiagnosticsPacket extends DataPacket implements ServerboundPack
 	 * @param MemoryCategoryCounter[]      $memoryCategoryValues
 	 * @param EntityDiagnosticTimingInfo[] $entityDiagnostics
 	 * @param SystemDiagnosticTimingInfo[] $systemDiagnostics
-	 * @param SystemCategory[]             $systemCategories
+	 * @param SystemCategory[]|null        $systemCategories
 	 * @param WhiskerScopeDataSummary[]    $whiskerScopes
 	 * @phpstan-param list<MemoryCategoryCounter>      $memoryCategoryValues
 	 * @phpstan-param list<EntityDiagnosticTimingInfo> $entityDiagnostics
 	 * @phpstan-param list<SystemDiagnosticTimingInfo> $systemDiagnostics
-	 * @phpstan-param list<SystemCategory>             $systemCategories
+	 * @phpstan-param list<SystemCategory>|null        $systemCategories
 	 * @phpstan-param list<WhiskerScopeDataSummary>    $whiskerScopes
 	 */
 	public static function create(
@@ -88,7 +89,7 @@ class ServerboundDiagnosticsPacket extends DataPacket implements ServerboundPack
 		array $memoryCategoryValues,
 		array $entityDiagnostics,
 		array $systemDiagnostics,
-		array $systemCategories,
+		?array $systemCategories,
 		array $whiskerScopes,
 	) : self{
 		$result = new self;
@@ -146,10 +147,10 @@ class ServerboundDiagnosticsPacket extends DataPacket implements ServerboundPack
 	public function getSystemDiagnostics() : array{ return $this->systemDiagnostics; }
 
 	/**
-	 * @return SystemCategory[]
-	 * @phpstan-return list<SystemCategory>
+	 * @return SystemCategory[]|null
+	 * @phpstan-return list<SystemCategory>|null
 	 */
-	public function getSystemCategories() : array{ return $this->systemCategories; }
+	public function getSystemCategories() : ?array{ return $this->systemCategories; }
 
 	/**
 	 * @return WhiskerScopeDataSummary[]
@@ -172,12 +173,17 @@ class ServerboundDiagnosticsPacket extends DataPacket implements ServerboundPack
 			$this->memoryCategoryValues = CommonTypes::readList($in, MemoryCategoryCounter::read(...));
 
 			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_20){
-				$this->entityDiagnostics = CommonTypes::readList($in, fn(ByteBufferReader $in) => EntityDiagnosticTimingInfo::read($in, $protocolId));
+				$this->entityDiagnostics = CommonTypes::readList($in, static fn(ByteBufferReader $in) => EntityDiagnosticTimingInfo::read($in, $protocolId));
 				$this->systemDiagnostics = CommonTypes::readList($in, SystemDiagnosticTimingInfo::read(...));
 
 				if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
-					$this->systemCategories = CommonTypes::readList($in, SystemCategory::read(...));
+					if($protocolId >= ProtocolInfo::PROTOCOL_1_26_60){
+						$this->systemCategories = CommonTypes::readOptional($in, static fn(ByteBufferReader $in) => CommonTypes::readList($in, SystemCategory::read(...)));
+					}else{
+						$this->systemCategories = CommonTypes::readList($in, SystemCategory::read(...));
+					}
 				}
+
 				if($protocolId >= ProtocolInfo::PROTOCOL_1_26_30){
 					$this->whiskerScopes = CommonTypes::readList($in, WhiskerScopeDataSummary::read(...));
 				}
@@ -197,17 +203,22 @@ class ServerboundDiagnosticsPacket extends DataPacket implements ServerboundPack
 		LE::writeFloat($out, $this->avgUnaccountedTimePercent);
 
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_0){
-			CommonTypes::writeList($out, $this->memoryCategoryValues, static fn($out, $v) => $v->write($out));
+			CommonTypes::writeList($out, $this->memoryCategoryValues, static fn(ByteBufferWriter $out, MemoryCategoryCounter $v) => $v->write($out));
 
 			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_20){
-				CommonTypes::writeList($out, $this->entityDiagnostics, fn(ByteBufferWriter $out, EntityDiagnosticTimingInfo $v) => $v->write($out, $protocolId));
-				CommonTypes::writeList($out, $this->systemDiagnostics, static fn($out, $v) => $v->write($out));
+				CommonTypes::writeList($out, $this->entityDiagnostics, static fn(ByteBufferWriter $out, EntityDiagnosticTimingInfo $v) => $v->write($out, $protocolId));
+				CommonTypes::writeList($out, $this->systemDiagnostics, static fn(ByteBufferWriter $out, SystemDiagnosticTimingInfo $v) => $v->write($out));
 
 				if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
-					CommonTypes::writeList($out, $this->systemCategories, static fn($out, $v) => $v->write($out));
+					if($protocolId >= ProtocolInfo::PROTOCOL_1_26_60){
+						CommonTypes::writeOptional($out, $this->systemCategories, static fn(ByteBufferWriter $out, array $categories) => CommonTypes::writeList($out, $categories, static fn(ByteBufferWriter $out, SystemCategory $v) => $v->write($out)));
+					}else{
+						CommonTypes::writeList($out, $this->systemCategories ?? [], static fn(ByteBufferWriter $out, SystemCategory $v) => $v->write($out));
+					}
 				}
+
 				if($protocolId >= ProtocolInfo::PROTOCOL_1_26_30){
-					CommonTypes::writeList($out, $this->whiskerScopes, static fn($out, $v) => $v->write($out));
+					CommonTypes::writeList($out, $this->whiskerScopes, static fn(ByteBufferWriter $out, WhiskerScopeDataSummary $v) => $v->write($out));
 				}
 			}
 		}

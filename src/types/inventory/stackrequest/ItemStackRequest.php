@@ -23,7 +23,6 @@ use pmmp\encoding\VarInt;
 use pocketmine\network\mcpe\protocol\PacketDecodeException;
 use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\CommonTypes;
-use function array_search;
 
 final class ItemStackRequest{
 	/**
@@ -79,45 +78,99 @@ final class ItemStackRequest{
 			CraftRecipeOptionalStackRequestAction::ID => CraftRecipeOptionalStackRequestAction::read($in, $protocolId),
 			GrindstoneStackRequestAction::ID => GrindstoneStackRequestAction::read($in, $protocolId),
 			LoomStackRequestAction::ID => LoomStackRequestAction::read($in, $protocolId),
+			CraftReservedStackRequestAction::ID => CraftReservedStackRequestAction::read($in),
 			DeprecatedCraftingNonImplementedStackRequestAction::ID => DeprecatedCraftingNonImplementedStackRequestAction::read($in, $protocolId),
 			DeprecatedCraftingResultsStackRequestAction::ID => DeprecatedCraftingResultsStackRequestAction::read($in, $protocolId),
 			default => throw new PacketDecodeException("Unhandled item stack request action type $typeId"),
 		};
 	}
 
+	/**
+	 * Converts a single type ID of an older protocol to the 1.18.10 - 1.26.30 numbering used by
+	 * {@link ItemStackRequestActionType::fromLegacyId()}.
+	 */
+	private static function normaliseLegacyTypeId(int $protocolId, int $typeId) : int{
+		//1.16.210 inserted MINE_BLOCK at 9 and 1.16.200 inserted CRAFTING_RECIPE_OPTIONAL at 13
+		if($protocolId < ProtocolInfo::PROTOCOL_1_16_210 && $typeId >= 9){
+			++$typeId;
+		}
+		if($protocolId < ProtocolInfo::PROTOCOL_1_16_200 && $typeId >= 13){
+			++$typeId;
+		}
+		//1.18.0 inserted grindstone and loom at 14 and 15, before the two deprecated crafting actions
+		if($protocolId < ProtocolInfo::PROTOCOL_1_18_0 && $typeId >= 14){
+			$typeId += 2;
+		}
+		//1.18.10 inserted the bundle actions at 7 and 8
+		if($protocolId < ProtocolInfo::PROTOCOL_1_18_10 && $typeId >= 7){
+			$typeId += 2;
+		}
+		return $typeId;
+	}
+
+	/**
+	 * Inverse of {@link ItemStackRequest::normaliseLegacyTypeId()}.
+	 *
+	 * @throws \InvalidArgumentException if the action doesn't exist in the given protocol
+	 */
+	private static function denormaliseLegacyTypeId(int $protocolId, int $typeId) : int{
+		if($protocolId < ProtocolInfo::PROTOCOL_1_18_10){
+			if($typeId === 7 || $typeId === 8){
+				throw new \InvalidArgumentException("Item stack request action $typeId does not exist in protocol $protocolId");
+			}
+			if($typeId > 8){
+				$typeId -= 2;
+			}
+		}
+		if($protocolId < ProtocolInfo::PROTOCOL_1_18_0){
+			if($typeId === 14 || $typeId === 15){
+				throw new \InvalidArgumentException("Item stack request action $typeId does not exist in protocol $protocolId");
+			}
+			if($typeId > 15){
+				$typeId -= 2;
+			}
+		}
+		if($protocolId < ProtocolInfo::PROTOCOL_1_16_200){
+			if($typeId === 13){
+				throw new \InvalidArgumentException("Item stack request action $typeId does not exist in protocol $protocolId");
+			}
+			if($typeId > 13){
+				--$typeId;
+			}
+		}
+		if($protocolId < ProtocolInfo::PROTOCOL_1_16_210){
+			if($typeId === 9){
+				throw new \InvalidArgumentException("Item stack request action $typeId does not exist in protocol $protocolId");
+			}
+			if($typeId > 9){
+				--$typeId;
+			}
+		}
+		return $typeId;
+	}
+
 	public static function read(ByteBufferReader $in, int $protocolId) : self{
 		$requestId = CommonTypes::readItemStackRequestId($in);
 		$actions = CommonTypes::readList($in, static function(ByteBufferReader $in) use ($protocolId) : ItemStackRequestAction{
-			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_60){
 				$typeId = VarInt::readUnsignedInt($in);
 				$innerTypeId = Byte::readUnsigned($in);
 				$expectedInnerType = ItemStackRequestActionType::INNER_TYPES[$typeId] ?? "unknown";
 				if($expectedInnerType !== $innerTypeId){
 					throw new PacketDecodeException("ItemStackRequestAction type mismatch: outer type $typeId, expected inner type $expectedInnerType, actual inner type $innerTypeId");
 				}
-			}else{
+			}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+				//1.26.40 - 1.26.50: pre-1.26.60 outer types, pre-1.26.40 inner IDs
+				$outerTypeId = VarInt::readUnsignedInt($in);
 				$innerTypeId = Byte::readUnsigned($in);
-				// 1.16.210 inserted MINE_BLOCK at 9 and 1.16.200 inserted CRAFTING_RECIPE_OPTIONAL
-				// before the deprecated actions; normalise older IDs to 1.17 numbering first.
-				if($protocolId < ProtocolInfo::PROTOCOL_1_16_210 && $innerTypeId >= 9){
-					++$innerTypeId;
+				$typeId = ItemStackRequestActionType::fromPre1_26_60OuterId($outerTypeId) ?? throw new PacketDecodeException("Unhandled item stack request action type $outerTypeId");
+				$expectedInnerType = ItemStackRequestActionType::toLegacyId($typeId) ?? "unknown";
+				if($expectedInnerType !== $innerTypeId){
+					throw new PacketDecodeException("ItemStackRequestAction type mismatch: outer type $outerTypeId, expected inner type $expectedInnerType, actual inner type $innerTypeId");
 				}
-				if($protocolId < ProtocolInfo::PROTOCOL_1_16_200 && $innerTypeId >= 13){
-					++$innerTypeId;
-				}
-				// 1.18 added grindstone and loom before the two deprecated
-				// crafting actions. 1.17 wire IDs 14/15 therefore map to
-				// modern IDs 18/19, not to grindstone/loom.
-				if($protocolId < ProtocolInfo::PROTOCOL_1_18_0 && $innerTypeId >= 14){
-					$innerTypeId += 2;
-				}
-				if($protocolId < ProtocolInfo::PROTOCOL_1_18_10 && $innerTypeId >= ItemStackRequestActionType::INNER_TYPES[ItemStackRequestActionType::LAB_TABLE_COMBINE]){
-					$innerTypeId += 2;
-				}
-				$typeId = array_search($innerTypeId, ItemStackRequestActionType::INNER_TYPES, true);
-				if($typeId === false){
-					throw new PacketDecodeException("Unhandled item stack request action type $innerTypeId");
-				}
+			}else{
+				$legacyTypeId = self::normaliseLegacyTypeId($protocolId, Byte::readUnsigned($in));
+				$typeId = ItemStackRequestActionType::fromLegacyId($legacyTypeId) ?? throw new PacketDecodeException("Unhandled item stack request action type $legacyTypeId");
 			}
 			return self::readAction($in, $protocolId, $typeId);
 		});
@@ -129,26 +182,19 @@ final class ItemStackRequest{
 	public function write(ByteBufferWriter $out, int $protocolId) : void{
 		CommonTypes::writeItemStackRequestId($out, $this->requestId);
 		CommonTypes::writeList($out, $this->actions, static function(ByteBufferWriter $out, ItemStackRequestAction $action) use ($protocolId) : void{
-			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
-				VarInt::writeUnsignedInt($out, $action->getTypeId());
+			$typeId = $action->getTypeId();
+			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_60){
+				$innerTypeId = ItemStackRequestActionType::INNER_TYPES[$typeId] ?? throw new \InvalidArgumentException("Item stack request action type $typeId is not supported by protocol $protocolId");
+				VarInt::writeUnsignedInt($out, $typeId);
+				Byte::writeUnsigned($out, $innerTypeId);
+			}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+				$outerTypeId = ItemStackRequestActionType::toPre1_26_60OuterId($typeId) ?? throw new \InvalidArgumentException("Item stack request action type $typeId is not supported by protocol $protocolId");
+				$innerTypeId = ItemStackRequestActionType::toLegacyId($typeId) ?? throw new \InvalidArgumentException("Item stack request action type $typeId is not supported by protocol $protocolId");
+				VarInt::writeUnsignedInt($out, $outerTypeId);
+				Byte::writeUnsigned($out, $innerTypeId);
+			}else{
+				Byte::writeUnsigned($out, self::denormaliseLegacyTypeId($protocolId, ItemStackRequestActionType::toLegacyId($typeId) ?? throw new \InvalidArgumentException("Item stack request action type $typeId is not supported by protocol $protocolId")));
 			}
-			$innerTypeId = ItemStackRequestActionType::INNER_TYPES[$action->getTypeId()];
-			if($protocolId < ProtocolInfo::PROTOCOL_1_18_10 && $innerTypeId >= ItemStackRequestActionType::INNER_TYPES[ItemStackRequestActionType::LAB_TABLE_COMBINE]){
-				$innerTypeId -= 2;
-			}
-			if($protocolId < ProtocolInfo::PROTOCOL_1_18_0 && $innerTypeId >= 16){
-				$innerTypeId -= 2;
-			}
-			if(($protocolId < ProtocolInfo::PROTOCOL_1_16_200 && $innerTypeId === 13) || ($protocolId < ProtocolInfo::PROTOCOL_1_16_210 && $innerTypeId === 9)){
-				throw new \InvalidArgumentException("Item stack request action " . $action->getTypeId() . " does not exist in protocol $protocolId");
-			}
-			if($protocolId < ProtocolInfo::PROTOCOL_1_16_200 && $innerTypeId > 13){
-				--$innerTypeId;
-			}
-			if($protocolId < ProtocolInfo::PROTOCOL_1_16_210 && $innerTypeId > 9){
-				--$innerTypeId;
-			}
-			Byte::writeUnsigned($out, $innerTypeId);
 			$action->write($out, $protocolId);
 		});
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_16_200){

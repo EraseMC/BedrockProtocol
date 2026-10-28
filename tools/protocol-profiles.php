@@ -21,7 +21,7 @@ declare(strict_types=1);
  * evidence that every client/profile has passed live testing. Preview protocol
  * IDs are deliberately not listed here.
  *
- * @return array<string, array{protocolId: int, accepted: bool}>
+ * @return array<string, array{protocolId: int, accepted: bool, comment?: string}>
  */
 return [
 	'PROTOCOL_1_16_0' => ['protocolId' => 407, 'accepted' => true],
@@ -76,8 +76,9 @@ return [
 	'PROTOCOL_1_26_10' => ['protocolId' => 944, 'accepted' => true],
 	'PROTOCOL_1_26_20' => ['protocolId' => 975, 'accepted' => true],
 	'PROTOCOL_1_26_30' => ['protocolId' => 1001, 'accepted' => true],
-	'PROTOCOL_1_26_40' => ['protocolId' => 2167, 'accepted' => true],
+	'PROTOCOL_1_26_40' => ['protocolId' => 2167, 'accepted' => false, 'comment' => 'Internal: 1.26.40 clients send 2168; servers switch to this when GameVersion < 1.26.44'],
 	'PROTOCOL_1_26_44' => ['protocolId' => 2168, 'accepted' => true],
 	'PROTOCOL_1_26_45' => ['protocolId' => 2169, 'accepted' => true],
 	'PROTOCOL_1_26_50' => ['protocolId' => 2193, 'accepted' => true],
+	'PROTOCOL_1_26_60' => ['protocolId' => 2225, 'accepted' => true],
 ];

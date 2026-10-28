@@ -38,10 +38,16 @@ final class ItemStackResponseSlotInfo{
 
 	public function getCount() : int{ return $this->count; }
 
+	/**
+	 * Optional since 1.26.40. Older protocols always send it (null is written as 0).
+	 */
 	public function getItemStackId() : ?int{ return $this->itemStackId; }
 
 	public function getCustomName() : string{ return $this->customName; }
 
+	/**
+	 * Optional since 1.26.40.
+	 */
 	public function getFilteredCustomName() : ?string{ return $this->filteredCustomName; }
 
 	public function getDurabilityCorrection() : int{ return $this->durabilityCorrection; }
@@ -58,15 +64,15 @@ final class ItemStackResponseSlotInfo{
 			$itemStackId = CommonTypes::readServerItemStackId($in);
 		}
 		$customName = $protocolId >= ProtocolInfo::PROTOCOL_1_16_200 ? CommonTypes::getString($in) : "";
-		if($protocolId >= ProtocolInfo::PROTOCOL_1_21_50){
-			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
-				$filteredCustomName = CommonTypes::readOptional($in, CommonTypes::getString(...));
-			}else{
-				$filteredCustomName = CommonTypes::getString($in);
-			}
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+			$filteredCustomName = CommonTypes::readOptional($in, CommonTypes::getString(...));
+		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_21_50){
+			$filteredCustomName = CommonTypes::getString($in);
+		}else{
+			$filteredCustomName = $customName;
 		}
 		$durabilityCorrection = $protocolId >= ProtocolInfo::PROTOCOL_1_16_210 ? VarInt::readSignedInt($in) : 0;
-		return new self($slot, $hotbarSlot, $count, $itemStackId, $customName, $filteredCustomName ?? $customName, $durabilityCorrection);
+		return new self($slot, $hotbarSlot, $count, $itemStackId, $customName, $filteredCustomName, $durabilityCorrection);
 	}
 
 	public function write(ByteBufferWriter $out, int $protocolId) : void{
@@ -78,17 +84,15 @@ final class ItemStackResponseSlotInfo{
 		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
 			CommonTypes::writeDoubleOptional($out, $this->itemStackId, CommonTypes::writeServerItemStackId(...));
 		}else{
-			CommonTypes::writeServerItemStackId($out, $this->itemStackId ?? throw new \InvalidArgumentException("itemStackId must be set before 1.26.40"));
+			CommonTypes::writeServerItemStackId($out, $this->itemStackId ?? 0);
 		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_16_200){
 			CommonTypes::putString($out, $this->customName);
 		}
-		if($protocolId >= ProtocolInfo::PROTOCOL_1_21_50){
-			if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
-				CommonTypes::writeOptional($out, $this->filteredCustomName, CommonTypes::putString(...));
-			}else{
-				CommonTypes::putString($out, $this->filteredCustomName ?? throw new \InvalidArgumentException("filteredCustomName must be set before 1.26.40"));
-			}
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+			CommonTypes::writeOptional($out, $this->filteredCustomName, CommonTypes::putString(...));
+		}elseif($protocolId >= ProtocolInfo::PROTOCOL_1_21_50){
+			CommonTypes::putString($out, $this->filteredCustomName ?? "");
 		}
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_16_210){
 			VarInt::writeSignedInt($out, $this->durabilityCorrection);

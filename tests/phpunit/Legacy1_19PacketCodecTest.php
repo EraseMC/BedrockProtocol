@@ -19,12 +19,14 @@ use pmmp\encoding\ByteBufferReader;
 use pmmp\encoding\ByteBufferWriter;
 use pocketmine\network\mcpe\protocol\serializer\CommonTypes;
 use pocketmine\network\mcpe\protocol\types\BlockPosition;
+use pocketmine\network\mcpe\protocol\types\command\CommandPermissions;
 use pocketmine\network\mcpe\protocol\types\CompressionAlgorithm;
 use pocketmine\network\mcpe\protocol\types\entity\EntityMetadataFlags;
 use pocketmine\network\mcpe\protocol\types\entity\EntityMetadataProperties;
 use pocketmine\network\mcpe\protocol\types\entity\LongMetadataProperty;
 use pocketmine\network\mcpe\protocol\types\inventory\ContainerUIIds;
 use pocketmine\network\mcpe\protocol\types\inventory\FullContainerName;
+use pocketmine\network\mcpe\protocol\types\PlayerPermissions;
 use pocketmine\network\mcpe\protocol\types\recipe\IntIdMetaItemDescriptor;
 use pocketmine\network\mcpe\protocol\types\recipe\RecipeIngredient;
 
@@ -106,14 +108,14 @@ final class Legacy1_19PacketCodecTest extends TestCase{
 	}
 
 	public function testAdventureSettingsUsesLegacyFixedLittleEndianActorId() : void{
-		$packet = AdventureSettingsPacket::create(1, 2, 3, 4, 5, -2);
-		self::assertSame(hex2bin('370102030405feffffffffffffff'), self::encode($packet, ProtocolInfo::PROTOCOL_1_19_0));
+		$packet = AdventureSettingsPacket::create(1, CommandPermissions::AUTOMATION, 3, PlayerPermissions::CUSTOM, 5, -2);
+		self::assertSame(hex2bin('370102030305feffffffffffffff'), self::encode($packet, ProtocolInfo::PROTOCOL_1_19_0));
 
 		$decoded = new AdventureSettingsPacket();
-		$decoded->decode(new ByteBufferReader(hex2bin('370102030405feffffffffffffff')), ProtocolInfo::PROTOCOL_1_19_0);
+		$decoded->decode(new ByteBufferReader(hex2bin('370102030305feffffffffffffff')), ProtocolInfo::PROTOCOL_1_19_0);
 		self::assertSame(-2, $decoded->targetActorUniqueId);
 
-		$flags = AdventureSettingsPacket::create(0, 0, 0, 0, 0, 0);
+		$flags = AdventureSettingsPacket::create(0, CommandPermissions::NORMAL, 0, PlayerPermissions::VISITOR, 0, 0);
 		$flags->setFlag(AdventureSettingsPacket::MINE, true);
 		self::assertSame(1, $flags->flags2);
 		self::assertTrue($flags->getFlag(AdventureSettingsPacket::MINE));

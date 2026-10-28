@@ -31,6 +31,7 @@ final class PrimitiveShapeTextPayload extends PrimitiveShapePayload{
 		private string $text,
 		private bool $useRotation,
 		private ?Color $backgroundColor,
+		/** >= ProtocolInfo::PROTOCOL_1_26_50 */
 		private float $lineGapHeight,
 		private bool $depthTest,
 		private bool $showBackface,
@@ -65,7 +66,11 @@ final class PrimitiveShapeTextPayload extends PrimitiveShapePayload{
 		return new self($text, $useRotation, $backgroundColor, $lineGapHeight ?? 0.0, $depthTest, $showBackface, $showTextBackface);
 	}
 
-	public function write(ByteBufferWriter $out, int $protocolId) : void{
+	/**
+	 * $protocolId is optional only to stay compatible with {@link PrimitiveShapePayload::write()}; callers must always
+	 * pass it (see PacketShapeData::write()).
+	 */
+	public function write(ByteBufferWriter $out, int $protocolId = ProtocolInfo::CURRENT_PROTOCOL) : void{
 		CommonTypes::putString($out, $this->text);
 		CommonTypes::putBool($out, $this->useRotation);
 		CommonTypes::writeOptional($out, $this->backgroundColor, CommonTypes::writeColor(...));

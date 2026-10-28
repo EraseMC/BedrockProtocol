@@ -24,9 +24,10 @@ use pocketmine\network\mcpe\protocol\types\skin\SkinData;
 use pocketmine\network\mcpe\protocol\types\skin\SkinImage;
 use Ramsey\Uuid\Uuid;
 use function array_map;
+use function array_pad;
+use function array_slice;
 use function array_values;
 use function base64_decode;
-use function count;
 use function hexdec;
 use function is_int;
 use function preg_match;
@@ -48,20 +49,19 @@ final class ClientDataToSkinDataHelper{
 
 	/**
 	 * Parses a hex color string in #AARRGGBB or shorter formats into a Color.
-	 *
-	 * @throws \InvalidArgumentException
+	 * Older clients are known to send empty or otherwise malformed colours (e.g. for default skins), so this falls back
+	 * to a transparent colour instead of rejecting the login.
 	 */
 	private static function parseColorString(string $colorString) : Color{
-		if(preg_match('/^#([a-fA-F0-9]{1,8})$/', $colorString, $matches) !== 1){
-			throw new \InvalidArgumentException("Invalid hex color string: '$colorString'");
+		if(preg_match('/^#([a-fA-F0-9]{1,8})$/', $colorString, $matches) === 1 && is_int($argb = hexdec($matches[1]))){
+			return Color::fromARGB($argb);
 		}
 
-		$argb = hexdec($matches[1]);
-		if(!is_int($argb)){
-			throw new \InvalidArgumentException("Invalid hex color string: '$colorString'");
-		}
+		return new Color(0, 0, 0, 0);
+	}
 
-		return Color::fromARGB($argb);
+	private static function parsePersonaSkinPieceType(string $pieceType) : PersonaSkinPieceType{
+		return PersonaSkinPieceType::tryFromJsonString($pieceType) ?? PersonaSkinPieceType::UNKNOWN;
 	}
 
 	/**
@@ -81,34 +81,23 @@ final class ClientDataToSkinDataHelper{
 	 * @throws \InvalidArgumentException
 	 */
 	private static function parsePersonaSkinPiece(ClientDataPersonaSkinPiece $piece) : PersonaSkinPiece{
-		if(!Uuid::isValid($piece->PackId)){
-			throw new \InvalidArgumentException("Invalid Persona skin piece pack ID: '$piece->PackId'");
-		}
-
 		return new PersonaSkinPiece(
 			$piece->PieceId,
-			PersonaSkinPieceType::fromJsonString($piece->PieceType),
-			Uuid::fromString($piece->PackId),
+			self::parsePersonaSkinPieceType($piece->PieceType),
+			Uuid::isValid($piece->PackId) ? Uuid::fromString($piece->PackId) : Uuid::fromString(Uuid::NIL),
 			$piece->IsDefault,
 			$piece->ProductId
 		);
 	}
 
-	/**
-	 * @throws \InvalidArgumentException
-	 */
 	private static function parsePersonaPieceTintColor(ClientDataPersonaPieceTintColor $tint) : PersonaPieceTintColor{
-		if(($colorsCount = count($tint->Colors)) !== PersonaPieceTintColor::EXPECTED_COLOR_COUNT){
-			throw new \InvalidArgumentException(
-				"Persona skin piece tint must contain exactly " . PersonaPieceTintColor::EXPECTED_COLOR_COUNT . " colors, got " . $colorsCount
-			);
-		}
-
+		$colors = array_map(self::parseColorString(...), array_values($tint->Colors));
+		//older clients don't always send exactly 4 colours; pad with transparent / truncate rather than failing the login
 		/** @phpstan-var array{Color, Color, Color, Color} $colors */
-		$colors = array_values(array_map(self::parseColorString(...), $tint->Colors));
+		$colors = array_slice(array_pad($colors, PersonaPieceTintColor::EXPECTED_COLOR_COUNT, new Color(0, 0, 0, 0)), 0, PersonaPieceTintColor::EXPECTED_COLOR_COUNT);
 
 		return new PersonaPieceTintColor(
-			PersonaSkinPieceType::fromJsonString($tint->PieceType),
+			self::parsePersonaSkinPieceType($tint->PieceType),
 			$colors
 		);
 	}
@@ -147,7 +136,7 @@ final class ClientDataToSkinDataHelper{
 			$clientData->SkinColor === "" ? null : self::parseColorString($clientData->SkinColor),
 			array_values(array_map(self::parsePersonaSkinPiece(...), $clientData->PersonaPieces)),
 			array_values(array_map(self::parsePersonaPieceTintColor(...), $clientData->PieceTintColors)),
-			$clientData->TrustedSkin ? SkinData::TRUSTED_SKIN_TRUE : SkinData::TRUSTED_SKIN_FALSE,
+			SkinData::TRUSTED_SKIN_TRUE, //TrustedSkin is Mojang's own content filter flag, we always trust skins
 			$clientData->PremiumSkin,
 			$clientData->PersonaSkin,
 			$clientData->CapeOnClassicSkin,

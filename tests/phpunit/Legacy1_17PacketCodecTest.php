@@ -110,7 +110,7 @@ final class Legacy1_17PacketCodecTest extends TestCase{
 		CommonTypes::putBlockPosition($out, $origin);
 		VarInt::writeSignedInt($out, 0); // face
 		VarInt::writeSignedInt($out, 0); // hotbar slot
-		CommonTypes::putItemStackWrapper($out, $protocolId, ItemStackWrapper::legacy(ItemStack::null()), false);
+		CommonTypes::putItemStackWrapper($out, $protocolId, ItemStackWrapper::legacy(ItemStack::null()));
 		CommonTypes::putVector3($out, new Vector3(0, 0, 0)); // player position
 		CommonTypes::putVector3($out, new Vector3(0, 0, 0)); // click position
 		VarInt::writeUnsignedInt($out, 0); // block runtime ID

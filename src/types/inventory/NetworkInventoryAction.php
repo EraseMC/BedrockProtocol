@@ -71,16 +71,80 @@ class NetworkInventoryAction{
 	public ?int $legacyNewItemStackId = null;
 
 	/**
+	 * Before 1.26.30 (InventoryTransactionPacket) / 1.26.40 (PlayerAuthInputPacket item interactions), actions used a
+	 * legacy layout where windowId/sourceFlags presence depended on the source type and items used the legacy item stack
+	 * format. Since then, both use the network item stack descriptor format, with windowId/sourceFlags as double optionals
+	 * (single optionals since 1.26.50).
+	 *
+	 * @param bool $authInput whether this action is part of a PlayerAuthInputPacket item interaction, which kept the
+	 *                        legacy layout one version longer (until 1.26.30 inclusive)
+	 * @param bool $legacyHasItemStackIds whether the transaction declared a trailing new item stack ID per action
+	 *                                    (InventoryTransactionPacket before 1.16.220)
+	 *
 	 * @return $this
 	 *
 	 * @throws DataDecodeException
 	 * @throws PacketDecodeException
 	 */
-	public function readAuthInput(ByteBufferReader $in, int $protocolId, bool $legacyHasItemStackIds = false) : NetworkInventoryAction{
-		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
-			return $this->readTransaction($in, $protocolId);
+	public function read(ByteBufferReader $in, int $protocolId, bool $authInput = false, bool $legacyHasItemStackIds = false) : NetworkInventoryAction{
+		if(self::usesLegacyLayout($protocolId, $authInput)){
+			return $this->readLegacy($in, $protocolId, $legacyHasItemStackIds);
 		}
 
+		$this->sourceType = VarInt::readUnsignedInt($in);
+
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50){
+			$this->windowId = CommonTypes::readOptional($in, Byte::readSigned(...));
+			$this->sourceFlags = CommonTypes::readOptional($in, VarInt::readUnsignedInt(...));
+		}else{
+			$this->windowId = CommonTypes::readDoubleOptional($in, Byte::readSigned(...));
+			$this->sourceFlags = CommonTypes::readDoubleOptional($in, VarInt::readUnsignedInt(...));
+		}
+
+		$this->inventorySlot = VarInt::readUnsignedInt($in);
+		$this->oldItem = CommonTypes::getNetworkItemStackDescriptor($in, $protocolId);
+		$this->newItem = CommonTypes::getNetworkItemStackDescriptor($in, $protocolId);
+
+		return $this;
+	}
+
+	/**
+	 * @see NetworkInventoryAction::read() for the meaning of $authInput
+	 *
+	 * @throws \InvalidArgumentException
+	 */
+	public function write(ByteBufferWriter $out, int $protocolId, bool $authInput = false, bool $legacyHasItemStackIds = false) : void{
+		if(self::usesLegacyLayout($protocolId, $authInput)){
+			$this->writeLegacy($out, $protocolId, $legacyHasItemStackIds);
+			return;
+		}
+
+		VarInt::writeUnsignedInt($out, $this->sourceType);
+
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50){
+			CommonTypes::writeOptional($out, $this->windowId, Byte::writeSigned(...));
+			CommonTypes::writeOptional($out, $this->sourceFlags, VarInt::writeUnsignedInt(...));
+		}else{
+			CommonTypes::writeDoubleOptional($out, $this->windowId, Byte::writeSigned(...));
+			CommonTypes::writeDoubleOptional($out, $this->sourceFlags, VarInt::writeUnsignedInt(...));
+		}
+
+		VarInt::writeUnsignedInt($out, $this->inventorySlot);
+		CommonTypes::putNetworkItemStackDescriptor($out, $protocolId, $this->oldItem);
+		CommonTypes::putNetworkItemStackDescriptor($out, $protocolId, $this->newItem);
+	}
+
+	private static function usesLegacyLayout(int $protocolId, bool $authInput) : bool{
+		return $authInput ? $protocolId <= ProtocolInfo::PROTOCOL_1_26_30 : $protocolId <= ProtocolInfo::PROTOCOL_1_26_20;
+	}
+
+	/**
+	 * @return $this
+	 *
+	 * @throws DataDecodeException
+	 * @throws PacketDecodeException
+	 */
+	private function readLegacy(ByteBufferReader $in, int $protocolId, bool $legacyHasItemStackIds) : NetworkInventoryAction{
 		$this->sourceType = VarInt::readUnsignedInt($in);
 
 		switch($this->sourceType){
@@ -100,8 +164,8 @@ class NetworkInventoryAction{
 		}
 
 		$this->inventorySlot = VarInt::readUnsignedInt($in);
-		$this->oldItem = CommonTypes::getItemStackWrapper($in, $protocolId, false);
-		$this->newItem = CommonTypes::getItemStackWrapper($in, $protocolId, false);
+		$this->oldItem = CommonTypes::getItemStackWrapper($in, $protocolId);
+		$this->newItem = CommonTypes::getItemStackWrapper($in, $protocolId);
 		if($legacyHasItemStackIds && $protocolId < ProtocolInfo::PROTOCOL_1_16_220){
 			$this->legacyNewItemStackId = CommonTypes::readServerItemStackId($in);
 		}
@@ -109,15 +173,7 @@ class NetworkInventoryAction{
 		return $this;
 	}
 
-	/**
-	 * @throws \InvalidArgumentException
-	 */
-	public function writeAuthInput(ByteBufferWriter $out, int $protocolId, bool $legacyHasItemStackIds = false) : void{
-		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
-			$this->writeTransaction($out, $protocolId);
-			return;
-		}
-
+	private function writeLegacy(ByteBufferWriter $out, int $protocolId, bool $legacyHasItemStackIds) : void{
 		VarInt::writeUnsignedInt($out, $this->sourceType);
 
 		switch($this->sourceType){
@@ -146,62 +202,10 @@ class NetworkInventoryAction{
 		}
 
 		VarInt::writeUnsignedInt($out, $this->inventorySlot);
-		CommonTypes::putItemStackWrapper($out, $protocolId, $this->oldItem, false);
-		CommonTypes::putItemStackWrapper($out, $protocolId, $this->newItem, false);
+		CommonTypes::putItemStackWrapper($out, $protocolId, $this->oldItem);
+		CommonTypes::putItemStackWrapper($out, $protocolId, $this->newItem);
 		if($legacyHasItemStackIds && $protocolId < ProtocolInfo::PROTOCOL_1_16_220){
 			CommonTypes::writeServerItemStackId($out, $this->legacyNewItemStackId ?? 0);
 		}
-	}
-
-	/**
-	 * @return $this
-	 *
-	 * @throws DataDecodeException
-	 * @throws PacketDecodeException
-	 */
-	public function readTransaction(ByteBufferReader $in, int $protocolId, bool $legacyHasItemStackIds = false) : NetworkInventoryAction{
-		if($protocolId <= ProtocolInfo::PROTOCOL_1_26_20){
-			return $this->readAuthInput($in, $protocolId, $legacyHasItemStackIds);
-		}
-
-		$this->sourceType = VarInt::readUnsignedInt($in);
-
-		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50){
-			$this->windowId = CommonTypes::readOptional($in, Byte::readSigned(...));
-			$this->sourceFlags = CommonTypes::readOptional($in, VarInt::readUnsignedInt(...));
-		}else{
-			$this->windowId = CommonTypes::readDoubleOptional($in, Byte::readSigned(...));
-			$this->sourceFlags = CommonTypes::readDoubleOptional($in, VarInt::readUnsignedInt(...));
-		}
-
-		$this->inventorySlot = VarInt::readUnsignedInt($in);
-		$this->oldItem = CommonTypes::getItemStackWrapper($in, $protocolId, true);
-		$this->newItem = CommonTypes::getItemStackWrapper($in, $protocolId, true);
-
-		return $this;
-	}
-
-	/**
-	 * @throws \InvalidArgumentException
-	 */
-	public function writeTransaction(ByteBufferWriter $out, int $protocolId, bool $legacyHasItemStackIds = false) : void{
-		if($protocolId <= ProtocolInfo::PROTOCOL_1_26_20){
-			$this->writeAuthInput($out, $protocolId, $legacyHasItemStackIds);
-			return;
-		}
-
-		VarInt::writeUnsignedInt($out, $this->sourceType);
-
-		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50){
-			CommonTypes::writeOptional($out, $this->windowId, Byte::writeSigned(...));
-			CommonTypes::writeOptional($out, $this->sourceFlags, VarInt::writeUnsignedInt(...));
-		}else{
-			CommonTypes::writeDoubleOptional($out, $this->windowId, Byte::writeSigned(...));
-			CommonTypes::writeDoubleOptional($out, $this->sourceFlags, VarInt::writeUnsignedInt(...));
-		}
-
-		VarInt::writeUnsignedInt($out, $this->inventorySlot);
-		CommonTypes::putItemStackWrapper($out, $protocolId, $this->oldItem, true);
-		CommonTypes::putItemStackWrapper($out, $protocolId, $this->newItem, true);
 	}
 }

@@ -53,8 +53,10 @@ final class CameraPreset{
 		private ?bool $alignTargetAndCameraForward,
 		private ?CameraPresetAimAssist $aimAssist,
 		private ?ControlScheme $controlScheme,
-		private bool $applyInheritedStartingRotation,
-		private ?Vector2 $startingRotation,
+		/** >= ProtocolInfo::PROTOCOL_1_26_50 */
+		private bool $applyInheritedStartingRotation = false,
+		/** >= ProtocolInfo::PROTOCOL_1_26_50 */
+		private ?Vector2 $startingRotation = null,
 	){}
 
 	public function getName() : string{ return $this->name; }
@@ -217,8 +219,6 @@ final class CameraPreset{
 			$nbt->getTag("player_effects") === null ? null : $nbt->getByte("player_effects") !== 0,
 			null,
 			null,
-			null,
-			false,
 			null,
 		);
 	}

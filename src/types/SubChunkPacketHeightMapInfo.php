@@ -20,6 +20,7 @@ use pmmp\encoding\ByteBufferWriter;
 use pmmp\encoding\VarInt;
 use pocketmine\network\mcpe\protocol\PacketDecodeException;
 use pocketmine\network\mcpe\protocol\ProtocolInfo;
+use function array_fill;
 use function count;
 
 class SubChunkPacketHeightMapInfo{
@@ -65,5 +66,31 @@ class SubChunkPacketHeightMapInfo{
 			}
 			Byte::writeSigned($out, $height);
 		}
+	}
+
+	public static function allTooLow() : self{
+		return new self(array_fill(0, self::TOTAL_LENGTH, -1));
+	}
+
+	public static function allTooHigh() : self{
+		return new self(array_fill(0, self::TOTAL_LENGTH, 16));
+	}
+
+	public function isAllTooLow() : bool{
+		foreach($this->heights as $height){
+			if($height >= 0){
+				return false;
+			}
+		}
+		return true;
+	}
+
+	public function isAllTooHigh() : bool{
+		foreach($this->heights as $height){
+			if($height <= 15){
+				return false;
+			}
+		}
+		return true;
 	}
 }

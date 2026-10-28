@@ -29,7 +29,7 @@ final class LevelSettings{
 	public int $seed;
 	public SpawnSettings $spawnSettings;
 	public int $generator = GeneratorType::OVERWORLD;
-	public int $worldGamemode;
+	public GameMode $worldGamemode;
 	public bool $hardcore = false;
 	public int $difficulty;
 	public BlockPosition $spawnPosition;
@@ -37,6 +37,8 @@ final class LevelSettings{
 	public int $editorWorldType = EditorWorldType::NON_EDITOR;
 	public bool $createdInEditorMode = false;
 	public bool $exportedFromEditorMode = false;
+	/** >= ProtocolInfo::PROTOCOL_1_26_60 */
+	public int $editorLevelMigrationVersion = EditorLevelMigrationVersion::LEGACY;
 	public int $time = -1;
 	public int $eduEditionOffer = EducationEditionOffer::NONE;
 	public bool $hasEduFeaturesEnabled = false;
@@ -58,7 +60,7 @@ final class LevelSettings{
 	public Experiments $experiments;
 	public bool $hasBonusChestEnabled = false;
 	public bool $hasStartWithMapEnabled = false;
-	public int $defaultPlayerPermission = PlayerPermissions::MEMBER; //TODO
+	public PlayerPermissions $defaultPlayerPermission = PlayerPermissions::MEMBER; //TODO
 
 	public int $serverChunkTickRadius = 4; //TODO (leave as default for now)
 
@@ -103,7 +105,7 @@ final class LevelSettings{
 		$this->seed = $protocolId >= ProtocolInfo::PROTOCOL_1_18_30 ? LE::readUnsignedLong($in) : VarInt::readSignedInt($in);
 		$this->spawnSettings = SpawnSettings::read($in);
 		$this->generator = VarInt::readSignedInt($in);
-		$this->worldGamemode = VarInt::readSignedInt($in);
+		$this->worldGamemode = GameMode::fromPacket(VarInt::readSignedInt($in));
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_20_80){
 			$this->hardcore = CommonTypes::getBool($in);
 		}
@@ -116,6 +118,9 @@ final class LevelSettings{
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_80){
 			$this->createdInEditorMode = CommonTypes::getBool($in);
 			$this->exportedFromEditorMode = CommonTypes::getBool($in);
+		}
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_60){
+			$this->editorLevelMigrationVersion = Byte::readSigned($in);
 		}
 		$this->time = VarInt::readSignedInt($in);
 		$this->eduEditionOffer = $protocolId >= ProtocolInfo::PROTOCOL_1_26_40 ? VarInt::readUnsignedInt($in) : VarInt::readSignedInt($in);
@@ -134,7 +139,7 @@ final class LevelSettings{
 		$this->experiments = $protocolId >= ProtocolInfo::PROTOCOL_1_16_100 ? Experiments::read($in) : new Experiments([], false);
 		$this->hasBonusChestEnabled = CommonTypes::getBool($in);
 		$this->hasStartWithMapEnabled = CommonTypes::getBool($in);
-		$this->defaultPlayerPermission = VarInt::readSignedInt($in);
+		$this->defaultPlayerPermission = PlayerPermissions::fromPacket($protocolId >= ProtocolInfo::PROTOCOL_1_26_40 ? Byte::readSigned($in) : VarInt::readSignedInt($in));
 		$this->serverChunkTickRadius = LE::readSignedInt($in); //doesn't make sense for this to be signed, but that's what the spec says
 		$this->hasLockedBehaviorPack = CommonTypes::getBool($in);
 		$this->hasLockedResourcePack = CommonTypes::getBool($in);
@@ -181,7 +186,7 @@ final class LevelSettings{
 		}
 		$this->spawnSettings->write($out);
 		VarInt::writeSignedInt($out, $this->generator);
-		VarInt::writeSignedInt($out, $this->worldGamemode);
+		VarInt::writeSignedInt($out, $this->worldGamemode->value);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_20_80){
 			CommonTypes::putBool($out, $this->hardcore);
 		}
@@ -198,6 +203,9 @@ final class LevelSettings{
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_19_80){
 			CommonTypes::putBool($out, $this->createdInEditorMode);
 			CommonTypes::putBool($out, $this->exportedFromEditorMode);
+		}
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_60){
+			Byte::writeSigned($out, $this->editorLevelMigrationVersion);
 		}
 		VarInt::writeSignedInt($out, $this->time);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
@@ -222,7 +230,11 @@ final class LevelSettings{
 		}
 		CommonTypes::putBool($out, $this->hasBonusChestEnabled);
 		CommonTypes::putBool($out, $this->hasStartWithMapEnabled);
-		VarInt::writeSignedInt($out, $this->defaultPlayerPermission);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_40){
+			Byte::writeSigned($out, $this->defaultPlayerPermission->value);
+		}else{
+			VarInt::writeSignedInt($out, $this->defaultPlayerPermission->value);
+		}
 		LE::writeSignedInt($out, $this->serverChunkTickRadius); //doesn't make sense for this to be signed, but that's what the spec says
 		CommonTypes::putBool($out, $this->hasLockedBehaviorPack);
 		CommonTypes::putBool($out, $this->hasLockedResourcePack);

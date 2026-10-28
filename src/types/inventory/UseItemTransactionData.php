@@ -40,7 +40,8 @@ class UseItemTransactionData extends TransactionData{
 	private BlockPosition $blockPosition;
 	private int $face;
 	private int $hotbarSlot;
-	private HandSlot $hand;
+	/** >= ProtocolInfo::PROTOCOL_1_26_50 */
+	private HandSlot $hand = HandSlot::MAINHAND;
 	private ItemStackWrapper $itemInHand;
 	private Vector3 $playerPosition;
 	private Vector3 $clickPosition;
@@ -105,11 +106,13 @@ class UseItemTransactionData extends TransactionData{
 		}
 		$this->hotbarSlot = VarInt::readSignedInt($in);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50){
-			$this->hand = HandSlot::fromPacket(Byte::readUnsigned($in));
-		}else{
-			$this->hand = HandSlot::MAINHAND;
+			$this->hand = CommonTypes::readHandSlot($in);
 		}
-		$this->itemInHand = CommonTypes::getItemStackWrapper($in, $protocolId, $protocolId >= ProtocolInfo::PROTOCOL_1_26_30);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_30){
+			$this->itemInHand = CommonTypes::getNetworkItemStackDescriptor($in, $protocolId);
+		}else{
+			$this->itemInHand = CommonTypes::getItemStackWrapper($in, $protocolId);
+		}
 		$this->playerPosition = CommonTypes::getVector3($in);
 		$this->clickPosition = CommonTypes::getVector3($in);
 		$this->blockRuntimeId = VarInt::readUnsignedInt($in);
@@ -142,9 +145,13 @@ class UseItemTransactionData extends TransactionData{
 		}
 		VarInt::writeSignedInt($out, $this->hotbarSlot);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_50){
-			Byte::writeUnsigned($out, $this->hand->value);
+			CommonTypes::writeHandSlot($out, $this->hand);
 		}
-		CommonTypes::putItemStackWrapper($out, $protocolId, $this->itemInHand, $protocolId >= ProtocolInfo::PROTOCOL_1_26_30);
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_26_30){
+			CommonTypes::putNetworkItemStackDescriptor($out, $protocolId, $this->itemInHand);
+		}else{
+			CommonTypes::putItemStackWrapper($out, $protocolId, $this->itemInHand);
+		}
 		CommonTypes::putVector3($out, $this->playerPosition);
 		CommonTypes::putVector3($out, $this->clickPosition);
 		VarInt::writeUnsignedInt($out, $this->blockRuntimeId);

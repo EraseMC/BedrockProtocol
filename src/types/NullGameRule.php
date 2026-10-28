@@ -16,7 +16,11 @@ namespace pocketmine\network\mcpe\protocol\types;
 
 use pmmp\encoding\ByteBufferReader;
 use pmmp\encoding\ByteBufferWriter;
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
 
+/**
+ * >= ProtocolInfo::PROTOCOL_1_26_40. Older protocols have no null game rule type.
+ */
 final class NullGameRule extends GameRule{
 	use GetTypeIdFromConstTrait;
 
@@ -27,6 +31,9 @@ final class NullGameRule extends GameRule{
 	}
 
 	public function encode(ByteBufferWriter $out, int $protocolId, bool $isStartGame) : void{
+		if($protocolId <= ProtocolInfo::PROTOCOL_1_26_30){
+			throw new \InvalidArgumentException("Null game rules are not supported before 1.26.40");
+		}
 		//NOOP
 	}
 

@@ -27,7 +27,7 @@ class PlayerLocationPacket extends DataPacket implements ClientboundPacket{
 
 	private PlayerLocationType $type;
 	private int $actorUniqueId;
-	private ?Vector3 $position;
+	private ?Vector3 $position = null;
 
 	/**
 	 * @generate-create-func

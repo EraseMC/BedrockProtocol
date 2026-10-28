@@ -19,6 +19,7 @@ use pmmp\encoding\ByteBufferWriter;
 use pmmp\encoding\VarInt;
 use pocketmine\network\mcpe\protocol\serializer\CommonTypes;
 use pocketmine\network\mcpe\protocol\types\DimensionData;
+use pocketmine\network\mcpe\protocol\types\DimensionNameIds;
 use function count;
 
 /**
@@ -57,6 +58,10 @@ class DimensionDataPacket extends DataPacket implements ClientboundPacket{
 			$dimensionNameId = CommonTypes::getString($in);
 			if(isset($this->definitions[$dimensionNameId])){
 				throw new PacketDecodeException("Repeated dimension data for key \"$dimensionNameId\"");
+			}
+			//upstream dropped this check in 1.26.40 (dimension definitions now carry a pack ID); kept for older protocols
+			if($protocolId <= ProtocolInfo::PROTOCOL_1_26_30 && $dimensionNameId !== DimensionNameIds::OVERWORLD && $dimensionNameId !== DimensionNameIds::NETHER && $dimensionNameId !== DimensionNameIds::THE_END){
+				throw new PacketDecodeException("Invalid dimension name ID \"$dimensionNameId\"");
 			}
 
 			$dimensionData = DimensionData::read($in, $protocolId);

@@ -8,6 +8,9 @@ use PHPUnit\Framework\TestCase;
 use pmmp\encoding\ByteBufferReader;
 use pmmp\encoding\ByteBufferWriter;
 use pocketmine\math\Vector3;
+use pocketmine\network\mcpe\protocol\types\inventory\stackrequest\BeaconPaymentStackRequestAction;
+use pocketmine\network\mcpe\protocol\types\inventory\stackrequest\ItemStackRequest;
+use pocketmine\network\mcpe\protocol\types\inventory\stackrequest\LabTableCombineStackRequestAction;
 use pocketmine\network\mcpe\protocol\types\LevelSoundEvent;
 use pocketmine\network\mcpe\protocol\types\SubChunkPosition;
 use pocketmine\network\mcpe\protocol\types\SubChunkPositionOffset;
@@ -101,5 +104,29 @@ final class Legacy1_18PacketCodecTest extends TestCase{
 		$tail = hex2bin('00000000000000000000000001013a0000');
 		self::assertSame(hex2bin('7bca02') . $tail, self::encode($newSound, ProtocolInfo::PROTOCOL_1_17_0));
 		self::assertSame(hex2bin('7bca02') . $tail, self::encode($newSound, ProtocolInfo::PROTOCOL_1_17_40));
+	}
+
+	public function testStackRequestActionIdsBeforeBundles() : void{
+		//1.18.10 inserted the two bundle actions at 7 and 8, moving the lab table and beacon actions up by two
+		foreach([
+			ProtocolInfo::PROTOCOL_1_16_220 => ['07', '08'],
+			ProtocolInfo::PROTOCOL_1_17_40 => ['07', '08'],
+			ProtocolInfo::PROTOCOL_1_18_0 => ['07', '08'],
+			ProtocolInfo::PROTOCOL_1_18_10 => ['09', '0a'],
+			ProtocolInfo::PROTOCOL_1_26_30 => ['09', '0a'],
+		] as $protocolId => [$labTable, $beacon]){
+			$filterStrings = $protocolId >= ProtocolInfo::PROTOCOL_1_19_30 ? '0000000000' : '00';
+			foreach([
+				'0201' . $labTable . $filterStrings => LabTableCombineStackRequestAction::class,
+				'0201' . $beacon . '0204' . $filterStrings => BeaconPaymentStackRequestAction::class,
+			] as $hex => $expectedClass){
+				$wire = (string) hex2bin($hex);
+				$decoded = ItemStackRequest::read(new ByteBufferReader($wire), $protocolId);
+				self::assertInstanceOf($expectedClass, $decoded->getActions()[0], "protocol $protocolId");
+				$out = new ByteBufferWriter();
+				$decoded->write($out, $protocolId);
+				self::assertSame($wire, $out->getData(), "protocol $protocolId");
+			}
+		}
 	}
 }

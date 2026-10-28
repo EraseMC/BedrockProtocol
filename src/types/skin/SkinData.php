@@ -40,6 +40,7 @@ class SkinData{
 	 */
 	public function __construct(
 		private string $skinId,
+		/** Only sent as part of the skin for protocols <= 1.26.50. Since 1.26.60 it is sent in the player list entry. */
 		private string $playFabId,
 		private string $resourcePatch,
 		private SkinImage $skinImage,
@@ -122,13 +123,12 @@ class SkinData{
 
 	public function getTrustedSkinFlag() : string{ return $this->trustedSkinFlag; }
 
-	public function isVerified() : bool{ return $this->trustedSkinFlag === self::TRUSTED_SKIN_TRUE; }
-
 	/**
+	 * Used to apply the separate "verified" bool that PlayerSkinPacket and PlayerListPacket carried before 1.26.40.
 	 * @internal
 	 */
-	public function setVerified(bool $verified) : void{
-		$this->trustedSkinFlag = $verified ? self::TRUSTED_SKIN_TRUE : self::TRUSTED_SKIN_FALSE;
+	public function setTrustedSkinFlag(string $trustedSkinFlag) : void{
+		$this->trustedSkinFlag = $trustedSkinFlag;
 	}
 
 	public function getProfileHash() : string{ return $this->profileHash; }

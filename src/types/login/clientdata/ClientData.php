@@ -94,7 +94,8 @@ final class ClientData{
 	/** >= ProtocolInfo::PROTOCOL_1_21_40 */
 	public int $MemoryTier;
 
-	public string $Nonce; //sometimes the client doesn't send it, apparently
+	/** >= ProtocolInfo::PROTOCOL_1_26_40 */
+	public string $Nonce = ""; //sometimes the client doesn't send it, apparently
 
 	public bool $OverrideSkin;
 

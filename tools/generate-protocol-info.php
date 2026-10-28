@@ -380,6 +380,9 @@ function generate_protocol_info(array $packetToIdList, int $protocolVersion, int
 	$protocolConstants = '';
 	$acceptedProfileDefinitions = [];
 	foreach($profileDefinitions as $name => $definition){
+		if(isset($definition['comment'])){
+			$protocolConstants .= sprintf("\t/** %s */\n", $definition['comment']);
+		}
 		$protocolConstants .= sprintf("\tpublic const %s = %d;\n", $name, $definition['protocolId']);
 		if($definition['accepted']){
 			$acceptedProfileDefinitions[$name] = $definition;

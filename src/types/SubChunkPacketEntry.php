@@ -62,6 +62,10 @@ final class SubChunkPacketEntry{
 
 	public function getUsedBlobHash() : ?int{ return $this->usedBlobHash; }
 
+	/**
+	 * @param bool $cacheEnabled only affects the wire format of protocols older than 1.26.40, where the presence of the
+	 *                           terrain data and the blob hash depended on whether the blob cache was enabled
+	 */
 	public static function read(ByteBufferReader $in, int $protocolId, bool $cacheEnabled) : self{
 		if($protocolId < ProtocolInfo::PROTOCOL_1_18_10){
 			$terrainData = CommonTypes::getString($in);
@@ -71,48 +75,24 @@ final class SubChunkPacketEntry{
 			$blobHash = $cacheEnabled && CommonTypes::getBool($in) ? LE::readUnsignedLong($in) : null;
 			return new self(new SubChunkPositionOffset(0, 0, 0), $requestResult, $terrainData, $heightMapType, $heightMapData, SubChunkPacketHeightMapType::ALL_COPIED, null, $blobHash);
 		}
+		if($protocolId <= ProtocolInfo::PROTOCOL_1_26_30){
+			return self::readLegacy($in, $protocolId, $cacheEnabled);
+		}
+
 		$offset = SubChunkPositionOffset::read($in);
 
 		$requestResult = Byte::readUnsigned($in);
 
-		if($protocolId < ProtocolInfo::PROTOCOL_1_26_40){
-			$data = !$cacheEnabled || $requestResult !== SubChunkRequestResult::SUCCESS_ALL_AIR ? CommonTypes::getString($in) : null;
-
-			$heightMapType = Byte::readUnsigned($in);
-			$heightMapData = $heightMapType === SubChunkPacketHeightMapType::DATA ? SubChunkPacketHeightMapInfo::read($in, $protocolId) : null;
-
-			if($protocolId >= ProtocolInfo::PROTOCOL_1_21_90){
-				$renderHeightMapType = Byte::readUnsigned($in);
-				$renderHeightMapData = $renderHeightMapType === SubChunkPacketHeightMapType::DATA ? SubChunkPacketHeightMapInfo::read($in, $protocolId) : null;
-			}else{
-				$renderHeightMapType = SubChunkPacketHeightMapType::ALL_COPIED;
-				$renderHeightMapData = null;
-			}
-
-			$blobHash = $cacheEnabled ? LE::readUnsignedLong($in) : null;
-
-			return new self(
-				$offset,
-				$requestResult,
-				$data,
-				$heightMapType,
-				$heightMapData,
-				$renderHeightMapType,
-				$renderHeightMapData,
-				$blobHash
-			);
-		}
-
 		$data = CommonTypes::readOptional($in, CommonTypes::getString(...));
 
 		$heightMapType = Byte::readUnsigned($in);
-		$heightMapData = CommonTypes::readOptional($in, fn(ByteBufferReader $in) => SubChunkPacketHeightMapInfo::read($in, $protocolId));
+		$heightMapData = CommonTypes::readOptional($in, static fn(ByteBufferReader $in) => SubChunkPacketHeightMapInfo::read($in, $protocolId));
 		if($heightMapType === SubChunkPacketHeightMapType::DATA && $heightMapData === null){
 			throw new PacketDecodeException("Heightmap data type is DATA but no heightmap data was provided");
 		}
 
 		$renderHeightMapType = Byte::readUnsigned($in);
-		$renderHeightMapData = CommonTypes::readOptional($in, fn(ByteBufferReader $in) => SubChunkPacketHeightMapInfo::read($in, $protocolId));
+		$renderHeightMapData = CommonTypes::readOptional($in, static fn(ByteBufferReader $in) => SubChunkPacketHeightMapInfo::read($in, $protocolId));
 		if($renderHeightMapType === SubChunkPacketHeightMapType::DATA && $renderHeightMapData === null){
 			//TODO: probably COPIED should bail if the first heightmap isn't provided somehow?
 			throw new PacketDecodeException("Render heightmap data type is DATA but no render heightmap data was provided");
@@ -132,6 +112,60 @@ final class SubChunkPacketEntry{
 		);
 	}
 
+	/**
+	 * Pre-1.26.40 layout (see SubChunkPacketEntryCommon/SubChunkPacketEntryWithCache): the terrain data is omitted for
+	 * SUCCESS_ALL_AIR results when the cache is enabled, heightmap data is only present for the DATA type, the render
+	 * heightmap only exists since 1.21.90, and the blob hash is a plain LE long present only when the cache is enabled.
+	 */
+	private static function readLegacy(ByteBufferReader $in, int $protocolId, bool $cacheEnabled) : self{
+		$offset = SubChunkPositionOffset::read($in);
+
+		$requestResult = Byte::readUnsigned($in);
+
+		$data = !$cacheEnabled || $requestResult !== SubChunkRequestResult::SUCCESS_ALL_AIR ? CommonTypes::getString($in) : null;
+
+		$heightMapType = Byte::readUnsigned($in);
+		$heightMapData = match($heightMapType){
+			SubChunkPacketHeightMapType::NO_DATA,
+			SubChunkPacketHeightMapType::ALL_TOO_HIGH,
+			SubChunkPacketHeightMapType::ALL_TOO_LOW => null,
+			SubChunkPacketHeightMapType::DATA => SubChunkPacketHeightMapInfo::read($in, $protocolId),
+			default => throw new PacketDecodeException("Unknown heightmap data type $heightMapType")
+		};
+
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_21_90){
+			$renderHeightMapType = Byte::readUnsigned($in);
+			$renderHeightMapData = match($renderHeightMapType){
+				SubChunkPacketHeightMapType::NO_DATA,
+				SubChunkPacketHeightMapType::ALL_TOO_HIGH,
+				SubChunkPacketHeightMapType::ALL_TOO_LOW,
+				SubChunkPacketHeightMapType::ALL_COPIED => null,
+				SubChunkPacketHeightMapType::DATA => SubChunkPacketHeightMapInfo::read($in, $protocolId),
+				default => throw new PacketDecodeException("Unknown render heightmap data type $renderHeightMapType")
+			};
+		}else{
+			//no separate render heightmap before 1.21.90 - the regular heightmap was used for everything
+			$renderHeightMapType = SubChunkPacketHeightMapType::ALL_COPIED;
+			$renderHeightMapData = null;
+		}
+
+		$blobHash = $cacheEnabled ? LE::readUnsignedLong($in) : null;
+
+		return new self(
+			$offset,
+			$requestResult,
+			$data,
+			$heightMapType,
+			$heightMapData,
+			$renderHeightMapType,
+			$renderHeightMapData,
+			$blobHash
+		);
+	}
+
+	/**
+	 * @param bool $cacheEnabled only affects the wire format of protocols older than 1.26.40
+	 */
 	public function write(ByteBufferWriter $out, int $protocolId, bool $cacheEnabled) : void{
 		if($protocolId < ProtocolInfo::PROTOCOL_1_18_10){
 			CommonTypes::putString($out, $this->terrainData ?? "");
@@ -146,37 +180,62 @@ final class SubChunkPacketEntry{
 			}
 			return;
 		}
+		if($protocolId <= ProtocolInfo::PROTOCOL_1_26_30){
+			$this->writeLegacy($out, $protocolId, $cacheEnabled);
+			return;
+		}
+
 		$this->offset->write($out);
 
 		Byte::writeUnsigned($out, $this->requestResult);
 
-		if($protocolId < ProtocolInfo::PROTOCOL_1_26_40){
-			if(!$cacheEnabled || $this->requestResult !== SubChunkRequestResult::SUCCESS_ALL_AIR){
-				CommonTypes::putString($out, $this->terrainData ?? "");
-			}
-
-			Byte::writeUnsigned($out, $this->heightMapType);
-			$this->heightMapData?->write($out, $protocolId);
-
-			if($protocolId >= ProtocolInfo::PROTOCOL_1_21_90){
-				Byte::writeUnsigned($out, $this->renderHeightMapType);
-				$this->renderHeightMapData?->write($out, $protocolId);
-			}
-
-			if($cacheEnabled){
-				LE::writeUnsignedLong($out, $this->usedBlobHash ?? throw new \InvalidArgumentException("usedBlobHash must be set when the client cache is enabled"));
-			}
-			return;
-		}
-
 		CommonTypes::writeOptional($out, $this->terrainData, CommonTypes::putString(...));
 
 		Byte::writeUnsigned($out, $this->heightMapType);
-		CommonTypes::writeOptional($out, $this->heightMapData, fn(ByteBufferWriter $out, SubChunkPacketHeightMapInfo $v) => $v->write($out, $protocolId));
+		CommonTypes::writeOptional($out, $this->heightMapData, static fn(ByteBufferWriter $out, SubChunkPacketHeightMapInfo $v) => $v->write($out, $protocolId));
 
 		Byte::writeUnsigned($out, $this->renderHeightMapType);
-		CommonTypes::writeOptional($out, $this->renderHeightMapData, fn(ByteBufferWriter $out, SubChunkPacketHeightMapInfo $v) => $v->write($out, $protocolId));
+		CommonTypes::writeOptional($out, $this->renderHeightMapData, static fn(ByteBufferWriter $out, SubChunkPacketHeightMapInfo $v) => $v->write($out, $protocolId));
 
 		CommonTypes::writeOptional($out, $this->usedBlobHash, LE::writeUnsignedLong(...));
+	}
+
+	private function writeLegacy(ByteBufferWriter $out, int $protocolId, bool $cacheEnabled) : void{
+		$this->offset->write($out);
+
+		Byte::writeUnsigned($out, $this->requestResult);
+
+		if(!$cacheEnabled || $this->requestResult !== SubChunkRequestResult::SUCCESS_ALL_AIR){
+			CommonTypes::putString($out, $this->terrainData ?? "");
+		}
+
+		if(
+			$this->heightMapType !== SubChunkPacketHeightMapType::NO_DATA &&
+			$this->heightMapType !== SubChunkPacketHeightMapType::DATA &&
+			$this->heightMapType !== SubChunkPacketHeightMapType::ALL_TOO_HIGH &&
+			$this->heightMapType !== SubChunkPacketHeightMapType::ALL_TOO_LOW
+		){
+			throw new \InvalidArgumentException("Heightmap data type $this->heightMapType is not supported by this protocol version");
+		}
+		Byte::writeUnsigned($out, $this->heightMapType);
+		if($this->heightMapType === SubChunkPacketHeightMapType::DATA){
+			$heightMapData = $this->heightMapData ?? throw new \AssertionError("Checked in constructor");
+			$heightMapData->write($out, $protocolId);
+		}
+
+		if($protocolId >= ProtocolInfo::PROTOCOL_1_21_90){
+			if($this->renderHeightMapType < SubChunkPacketHeightMapType::NO_DATA || $this->renderHeightMapType > SubChunkPacketHeightMapType::ALL_COPIED){
+				throw new \InvalidArgumentException("Render heightmap data type $this->renderHeightMapType is not supported by this protocol version");
+			}
+			Byte::writeUnsigned($out, $this->renderHeightMapType);
+			if($this->renderHeightMapType === SubChunkPacketHeightMapType::DATA){
+				$renderHeightMapData = $this->renderHeightMapData ?? throw new \AssertionError("Checked in constructor");
+				$renderHeightMapData->write($out, $protocolId);
+			}
+		}
+
+		if($cacheEnabled){
+			LE::writeUnsignedLong($out, $this->usedBlobHash ?? throw new \InvalidArgumentException("usedBlobHash must be set when the cache is enabled"));
+		}
 	}
 }

@@ -128,4 +128,23 @@ final class MemoryCategory{
 	public const GAMEFACE_SCRIPT_ENGINE = 107;
 	public const GAMEFACE_SCRIPT = 108;
 	public const GAMEFACE_LAYOUT = 109;
+	public const EXECUTABLE = 110;
+
+	/*
+	 * Removed in 1.26.40, which also renumbered most of the constants above (the constants above hold the newest
+	 * values). These keep their <= 1.26.30 values for BC only and overlap with the newer numbering.
+	 */
+	/** @deprecated 1.26.40 */
+	public const BALANCER = 5;
+	/** @deprecated 1.26.40 */
+	public const PERSONA = 54;
+	/** @deprecated 1.26.40 */
+	public const VR = 68;
+
+	/*
+	 * Removed in 1.26.50, which renumbered every constant after it (the constants above hold the 1.26.50 values).
+	 * Keeps its 1.26.40/1.26.45 value for BC only and overlaps with the newer numbering.
+	 */
+	/** @deprecated 1.26.50 */
+	public const PERSONA_TEXTURES = 58;
 }

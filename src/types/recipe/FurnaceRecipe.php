@@ -21,17 +21,19 @@ use pocketmine\network\mcpe\protocol\CraftingDataPacket;
 use pocketmine\network\mcpe\protocol\serializer\CommonTypes;
 use pocketmine\network\mcpe\protocol\types\inventory\ItemStack;
 
-final class FurnaceRecipe{
+/**
+ * Legacy furnace recipe, only sent in the type-tagged recipe list used before 1.26.40 (removed upstream in 1.26.20).
+ * Uses its type ID to distinguish ENTRY_FURNACE (no input meta) from ENTRY_FURNACE_DATA.
+ */
+final class FurnaceRecipe extends RecipeWithTypeId{
 	public function __construct(
-		private int $typeId,
+		int $typeId,
 		private int $inputId,
 		private ?int $inputMeta,
 		private ItemStack $result,
 		private string $blockName
-	){}
-
-	public function getTypeId() : int{
-		return $this->typeId;
+	){
+		parent::__construct($typeId);
 	}
 
 	public function getInputId() : int{

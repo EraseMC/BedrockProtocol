@@ -53,12 +53,10 @@ final class GrindstoneStackRequestAction extends ItemStackRequestAction{
 		}else{
 			$recipeId = CommonTypes::readRecipeNetId($in);
 			$repairCost = VarInt::readSignedInt($in); //WHY!!!!
-			if($protocolId >= ProtocolInfo::PROTOCOL_1_21_20){
-				$repetitions = Byte::readUnsigned($in);
-			}
+			$repetitions = $protocolId >= ProtocolInfo::PROTOCOL_1_21_20 ? Byte::readUnsigned($in) : 0;
 		}
 
-		return new self($recipeId, $repairCost, $repetitions ?? 0);
+		return new self($recipeId, $repairCost, $repetitions);
 	}
 
 	public function write(ByteBufferWriter $out, int $protocolId) : void{
