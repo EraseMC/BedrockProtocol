@@ -22,6 +22,7 @@ use pmmp\encoding\LE;
 use pmmp\encoding\VarInt;
 use pocketmine\network\mcpe\protocol\PacketDecodeException;
 use pocketmine\network\mcpe\protocol\ProtocolInfo;
+use pocketmine\network\mcpe\protocol\ProtocolVersions;
 use pocketmine\network\mcpe\protocol\serializer\CommonTypes;
 
 final class LevelSettings{
@@ -250,7 +251,7 @@ final class LevelSettings{
 				CommonTypes::putBool($out, $this->muteEmoteAnnouncements);
 			}
 		}
-		CommonTypes::putString($out, $this->vanillaVersion);
+		CommonTypes::putString($out, ProtocolVersions::clamp($this->vanillaVersion, $protocolId, "*"));
 		LE::writeSignedInt($out, $this->limitedWorldWidth); //doesn't make sense for this to be signed, but that's what the spec says
 		LE::writeSignedInt($out, $this->limitedWorldLength); //same as above
 		CommonTypes::putBool($out, $this->isNewNether);

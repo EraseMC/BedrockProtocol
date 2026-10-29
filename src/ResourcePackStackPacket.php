@@ -89,7 +89,7 @@ class ResourcePackStackPacket extends DataPacket implements ClientboundPacket{
 			$entry->write($out);
 		}
 
-		CommonTypes::putString($out, $this->baseGameVersion);
+		CommonTypes::putString($out, ProtocolVersions::clamp($this->baseGameVersion, $protocolId, "*"));
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_16_100){
 			$this->experiments->write($out);
 		}else{

@@ -28,6 +28,7 @@ use pocketmine\nbt\tag\CompoundTag;
 use pocketmine\nbt\TreeRoot;
 use pocketmine\network\mcpe\protocol\PacketDecodeException;
 use pocketmine\network\mcpe\protocol\ProtocolInfo;
+use pocketmine\network\mcpe\protocol\ProtocolVersions;
 use pocketmine\network\mcpe\protocol\types\BlockPosition;
 use pocketmine\network\mcpe\protocol\types\BoolGameRule;
 use pocketmine\network\mcpe\protocol\types\command\CommandOriginData;
@@ -324,7 +325,7 @@ final class CommonTypes{
 		self::putSkinImage($out, $skin->getCapeImage());
 		self::putString($out, $skin->getGeometryDataJson());
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_17_30){
-			self::putString($out, $skin->getGeometryDataEngineVersion());
+			self::putString($out, ProtocolVersions::limit($skin->getGeometryDataEngineVersion(), $protocolId));
 		}
 		self::putString($out, $skin->getAnimationData());
 		if($protocolId < ProtocolInfo::PROTOCOL_1_17_30){
