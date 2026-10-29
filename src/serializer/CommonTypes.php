@@ -323,7 +323,9 @@ final class CommonTypes{
 			}
 		}
 		self::putSkinImage($out, $skin->getCapeImage());
-		self::putString($out, $skin->getGeometryDataJson());
+		//clients before 1.26.60 draw nothing for an empty geometry object, but the default model for "null"
+		$geometryData = $skin->getGeometryDataJson();
+		self::putString($out, $geometryData === SkinData::GEOMETRY_DATA_NONE && $protocolId < ProtocolInfo::PROTOCOL_1_26_60 ? "null" : $geometryData);
 		if($protocolId >= ProtocolInfo::PROTOCOL_1_17_30){
 			self::putString($out, ProtocolVersions::limit($skin->getGeometryDataEngineVersion(), $protocolId));
 		}
